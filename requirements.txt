@@ -1,0 +1,2 @@
+crc==7.0.0
+simplepyble==0.7.3
