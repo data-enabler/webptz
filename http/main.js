@@ -36,8 +36,8 @@ function pollGamepads() {
 }
 
 function pollGamepad(pad, cameraNum) {
-  const pan = ignoreDeadzone(pad.axes[0]);
-  const tilt = ignoreDeadzone(-1 * pad.axes[1]);
+  const pan = ignoreDeadzone(pad.axes[0]) || ignoreDeadzone(pad.axes[2]);
+  const tilt = ignoreDeadzone(-1 * pad.axes[1]) || ignoreDeadzone(-1 * pad.axes[3]);
   visualizer.style.left = `${pan * 50 + 50}%`;
   visualizer.style.bottom = `${tilt * 50 + 50}%`;
   if (pan === 0 && tilt === 0) {
