@@ -3,7 +3,7 @@ const DEADZONE = 0.1;
 
 const websocket = new WebSocket("/control");
 
-const visualizer = document.querySelectorAll('.joystick__stick')[0];
+const visualizer = /** @type {HTMLElement} */ (document.querySelectorAll('.joystick__stick')[0]);
 
 window.addEventListener("gamepadconnected", (e) => {
   console.log(
@@ -32,10 +32,10 @@ function pollGamepads() {
     return;
   }
 
-  pollGamepad(pads[0], 0);
+  pollGamepad(pads[0]);
 }
 
-function pollGamepad(pad, cameraNum) {
+function pollGamepad(pad) {
   const pan = ignoreDeadzone(pad.axes[0]) || ignoreDeadzone(pad.axes[2]);
   const tilt = ignoreDeadzone(-1 * pad.axes[1]) || ignoreDeadzone(-1 * pad.axes[3]);
   visualizer.style.left = `${pan * 50 + 50}%`;
@@ -44,7 +44,7 @@ function pollGamepad(pad, cameraNum) {
     return;
   }
   const data = {
-    camera: cameraNum,
+    devices: [],
     pan,
     tilt,
     roll: 0,
