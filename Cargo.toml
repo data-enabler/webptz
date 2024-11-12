@@ -1,0 +1,19 @@
+[package]
+name = "webptz"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.83"
+axum = { version = "0.7.7", features = ["ws"] }
+axum-extra = { version = "0.9.4", features = ["typed-header"] }
+btleplug = "0.11.6"
+crc = "3.2.1"
+futures = "0.3.31"
+hex = "0.4.3"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.132"
+tokio = { version = "1.41.1", features = ["full"] }
+tower-http = { version = "0.6.1", features = ["fs"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+uuid = "1.11.0"
