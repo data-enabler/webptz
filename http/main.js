@@ -36,8 +36,15 @@ function pollGamepads() {
 }
 
 function pollGamepad(pad, cameraNum) {
-  const pan = ignoreDeadzone(pad.axes[0]) || ignoreDeadzone(pad.axes[2]);
-  const tilt = ignoreDeadzone(-1 * pad.axes[1]) || ignoreDeadzone(-1 * pad.axes[3]);
+  const axis_lx = 0;
+  const axis_ly = 1;
+  const axis_rx = 2;
+  let axis_ry = 3;
+  if (pad.id.includes('DualSense')) {
+    axis_ry = 5;
+  }
+  const pan = ignoreDeadzone(pad.axes[axis_lx]) || ignoreDeadzone(pad.axes[axis_rx]);
+  const tilt = ignoreDeadzone(-1 * pad.axes[axis_ly]) || ignoreDeadzone(-1 * pad.axes[axis_ry]);
   visualizer.style.left = `${pan * 50 + 50}%`;
   visualizer.style.bottom = `${tilt * 50 + 50}%`;
   if (pan === 0 && tilt === 0) {
