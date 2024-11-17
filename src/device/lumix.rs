@@ -305,7 +305,7 @@ pub async fn connect(address: String, password: Option<String>) -> Result<Lumix,
 
     let mut socket = create_socket(address.to_string(), port).await?;
 
-    let init_cmd = hex::decode("34000000_01000000_ffffffffffffffffffffffffffffffff_4c0055004d00490058005400650074006800650072000000_00000100".replace("_", "")).unwrap();
+    let init_cmd = hex::decode(format!("34000000_01000000_ffffffffffffffffffffffffffffffff_{}_00000100", hex::encode(encode_str(APP_NAME))).replace("_", "")).unwrap();
     socket.write_and_read_resp(&init_cmd).await?;
 
     let mut event_socket = create_socket(address.to_string(), port).await?;
@@ -329,6 +329,19 @@ pub async fn connect(address: String, password: Option<String>) -> Result<Lumix,
     };
     println!("{}: Connected", lumix);
     Ok(lumix)
+}
+
+fn encode_str(s: &str) -> Vec<u8> {
+    let mut as_utf16: Vec<u16> = s.encode_utf16().collect();
+    as_utf16.push(0x0000);
+    let as_bytes: Vec<u8> = as_utf16.iter().flat_map(|x| x.to_le_bytes()).collect();
+    return as_bytes;
+}
+
+#[test]
+fn test_encode_str() {
+    let as_bytes = encode_str("LUMIXTether");
+    assert_eq!(hex::encode(as_bytes), "4c0055004d00490058005400650074006800650072000000");
 }
 
 async fn create_socket(address: String, port: u16) -> io::Result<TcpStream> {
