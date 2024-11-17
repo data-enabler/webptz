@@ -86,6 +86,9 @@ impl super::Device for Ronin {
 
     async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {
         println!("{}: Received command {:?}", self, command);
+        if command.pan == 0.0 && command.tilt == 0.0 && command.roll == 0.0 {
+            return Ok(());
+        }
         let pan_int = scale_value(command.pan);
         let tilt_int = scale_value(command.tilt);
         let roll_int = scale_value(command.roll);
