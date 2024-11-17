@@ -2,8 +2,27 @@ const POLLING_RATE = 200;
 const DEADZONE = 0.1;
 
 const websocket = new WebSocket("/control");
-
 const visualizer = /** @type {HTMLElement} */ (document.querySelectorAll('.joystick__stick')[0]);
+const zoomSlider = /** @type {HTMLInputElement} */ (document.querySelectorAll('.joystick__zoom')[0]);
+
+/**
+ * @typedef {{
+ *  devices: string[],
+ *  pan: number,
+ *  tilt: number,
+ *  roll: number,
+ *  zoom: number,
+ * }} Data
+ */
+
+/** @type {Data} */
+let lastData = {
+  devices: [],
+  pan: 0,
+  tilt: 0,
+  roll: 0,
+  zoom: 0,
+};
 
 window.addEventListener("gamepadconnected", (e) => {
   console.log(
@@ -27,37 +46,69 @@ function ignoreDeadzone(val) {
 }
 
 function pollGamepads() {
-  const pads = navigator.getGamepads().filter(nonNull);
-  if (pads.length === 0) {
+  const pad = navigator.getGamepads().filter(nonNull)[0];
+  if (pad == null) {
     return;
   }
 
-  pollGamepad(pads[0]);
+  pollGamepad(pad);
 }
 
+/**
+ * @param {Gamepad} pad
+ * @returns
+ */
 function pollGamepad(pad) {
-  const axis_lx = 0;
-  const axis_ly = 1;
-  const axis_rx = 2;
-  let axis_ry = 3;
+  const pan1 = ignoreDeadzone(pad.axes[0]);
+  const tilt1 = ignoreDeadzone(-1 * pad.axes[1]);
+  let zoom1 = ignoreDeadzone(pad.buttons[6].value - pad.buttons[4].value);
+  const pan2 =  ignoreDeadzone(pad.axes[2]);
+  let tilt2 = ignoreDeadzone(-1 * pad.axes[3]);
+  let zoom2 = ignoreDeadzone(pad.buttons[7].value - pad.buttons[5].value);
+
+  // Doesn't have a standard mapping
   if (pad.id.includes('DualSense')) {
-    axis_ry = 5;
+    tilt2 = ignoreDeadzone(-1 * pad.axes[5]);
+
+    // DualSense triggers are cursed; they have a value of 0.0 until you first
+    // press them. Relying on the assumption that 0.0 is basically impossible
+    // to get otherwise.
+    const axis3 = pad.axes[3] || -1;
+    const axis4 = pad.axes[4] || -1;
+    zoom1 = ignoreDeadzone((axis3 + 1) / 2 - pad.buttons[4].value);
+    zoom2 = ignoreDeadzone((axis4 + 1) / 2 - pad.buttons[5].value);
   }
-  const pan = ignoreDeadzone(pad.axes[axis_lx]) || ignoreDeadzone(pad.axes[axis_rx]);
-  const tilt = ignoreDeadzone(-1 * pad.axes[axis_ly]) || ignoreDeadzone(-1 * pad.axes[axis_ry]);
+
+  const pan = pan1 || pan2;
+  const tilt = tilt1 || tilt2;
+  const roll = 0;
+  const zoom = zoom1 || zoom2;
   visualizer.style.left = `${pan * 50 + 50}%`;
   visualizer.style.bottom = `${tilt * 50 + 50}%`;
-  if (pan === 0 && tilt === 0) {
-    return;
-  }
+  zoomSlider.value = zoom;
+
+  /** @type {Data} */
   const data = {
     devices: [],
     pan,
     tilt,
-    roll: 0,
+    roll,
+    zoom,
   };
+  if (isZero(data) && isZero(lastData)) {
+    return;
+  }
   console.log(data);
   websocket.send(JSON.stringify(data));
+  lastData = data;
+}
+
+/**
+ * @param {Data} data
+ * @returns {boolean}
+ */
+function isZero(data) {
+  return data.pan === 0 && data.tilt === 0 && data.roll === 0 && data.zoom === 0;
 }
 
 window.setInterval(pollGamepads, POLLING_RATE);

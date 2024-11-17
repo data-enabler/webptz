@@ -35,7 +35,7 @@ fn encode_value(val: i16) -> Vec<u8> {
         .to_vec();
 }
 
-pub fn create_packet(seq_num: u16, pan: i16, tilt: i16, roll: i16) -> Vec<u8> {
+fn create_packet(seq_num: u16, pan: i16, tilt: i16, roll: i16) -> Vec<u8> {
     let prefix = vec![0x55, 0x16, 0x04, 0xfc, 0x02, 0x04];
     let midfix = vec![0x40, 0x04, 0x01];
     let suffix = vec![0x00, 0x00, 0x02];
@@ -61,33 +61,12 @@ pub struct Ronin {
     name: String,
     seq: u16,
     peripheral: Peripheral,
-    characteristic: Option<Characteristic>,
+    characteristic: Characteristic,
 }
 
 impl Ronin {
-    pub fn new(peripheral: Peripheral) -> Self {
-        Self {
-            name: peripheral.id().to_string(),
-            seq: 0,
-            peripheral,
-            characteristic: None,
-        }
-    }
-
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-
-    pub fn reset_seq(&mut self) {
-        self.seq = 0;
-    }
-
     pub fn inc_seq(&mut self) {
         self.seq = self.seq.wrapping_add(1);
-    }
-
-    pub fn set_characteristic(&mut self, characteristic: Characteristic) {
-        self.characteristic = Some(characteristic);
     }
 }
 
@@ -99,29 +78,6 @@ impl std::fmt::Display for Ronin {
 
 #[async_trait]
 impl super::Device for Ronin {
-    async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
-        match self
-            .peripheral
-            .properties()
-            .await?
-            .and_then(|p| p.local_name)
-        {
-            Some(x) => self.set_name(x),
-            None => (),
-        }
-        println!("{}: Connecting", self);
-        self.peripheral.connect().await?;
-        self.peripheral.discover_services().await?;
-        let chars = self.peripheral.characteristics();
-        self.set_characteristic(match chars.iter().find(|c| c.uuid == CHARACTERISTIC_UUID) {
-            None => return Err("characteristic not found".into()),
-            Some(x) => x.to_owned(),
-        });
-        self.reset_seq();
-        println!("{}: Connected", self);
-        Ok(())
-    }
-
     async fn disconnect(&mut self) -> Result<(), Box<dyn Error>> {
         println!("{}: Disconnecting", self);
         self.peripheral.disconnect().await?;
@@ -129,19 +85,40 @@ impl super::Device for Ronin {
     }
 
     async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {
-        let char = match &self.characteristic {
-            None => return Err("device not connected".into()),
-            Some(x) => x,
-        };
+        println!("{}: Received command {:?}", self, command);
         let pan_int = scale_value(command.pan);
         let tilt_int = scale_value(command.tilt);
         let roll_int = scale_value(command.roll);
         let content = create_packet(self.seq, pan_int, tilt_int, roll_int);
         println!("{}: Sending {}", self, hex::encode(&content));
         self.peripheral
-            .write(&char, &content, WriteType::WithoutResponse)
+            .write(&self.characteristic, &content, WriteType::WithoutResponse)
             .await?;
         self.inc_seq();
         Ok(())
     }
+}
+
+pub async fn connect(peripheral: Peripheral) -> Result<Ronin, Box<dyn Error>> {
+    let name = peripheral
+        .properties()
+        .await?
+        .and_then(|p| p.local_name)
+        .unwrap_or(peripheral.id().to_string());
+    println!("Ronin[{}]: Connecting", name);
+    peripheral.connect().await?;
+    peripheral.discover_services().await?;
+    let chars = peripheral.characteristics();
+    let characteristic = match chars.iter().find(|c| c.uuid == CHARACTERISTIC_UUID) {
+        None => return Err("characteristic not found".into()),
+        Some(x) => x.to_owned(),
+    };
+    let ronin = Ronin {
+        name,
+        seq: 0,
+        peripheral,
+        characteristic,
+    };
+    println!("{}: Connected", ronin);
+    Ok(ronin)
 }

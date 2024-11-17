@@ -41,8 +41,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // for now, just send to all devices
                 for device in devices.iter_mut() {
                     match device.send_command(request.command).await {
-                        Ok(_) => println!("Command sent successfully"),
                         Err(e) => println!("Error sending command: {}", e),
+                        _ => (),
                     }
                 }
             }
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Shutting down...");
                 match future::try_join_all(devices.iter_mut().map(|d| d.disconnect())).await {
                     Err(e) => println!("Error disconnecting devices: {}", e),
-                    _ => ()
+                    _ => (),
                 }
                 break;
             }
@@ -110,14 +110,16 @@ async fn get_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<dyn E
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     central.stop_scan().await?;
 
-    let mut device: Box<dyn device::Device> = match find_gimbal(&central).await {
+    let device: Box<dyn device::Device> = match find_gimbal(&central).await {
         // None => return Err("no gimbal found".into()),
-        None => Box::new(device::dummy::Dummy{}),
-        Some(x) => Box::new(device::ronin::Ronin::new(x)),
+        None => Box::new(device::dummy::connect().await?),
+        Some(x) => Box::new(device::ronin::connect(x).await?),
     };
-
-    device.connect().await?;
     devices.push(device);
+
+    let lumix = device::lumix::connect("192.168.88.16".to_string(), Some("ED8834C9E19D27EA".to_string())).await?;
+    devices.push(Box::new(lumix));
+
     Ok(())
 }
 
