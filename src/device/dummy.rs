@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use async_trait::async_trait;
 
 pub struct Dummy {}
@@ -10,19 +12,29 @@ impl std::fmt::Display for Dummy {
 
 #[async_trait]
 impl super::Device for Dummy {
-    async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {
         println!("{}: Received command {:?}", self, command);
         Ok(())
     }
 
-    async fn disconnect(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("{}: Connected", self);
+        Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<(), Box<dyn Error>> {
         println!("{}: Disconnecting", self);
+        Ok(())
+    }
+
+    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>> {
+        self.disconnect().await?;
+        self.connect().await?;
         Ok(())
     }
 }
 
-pub async fn connect() -> Result<Dummy, Box<dyn std::error::Error>> {
-    let dummy = Dummy{};
-    println!("{}: Connected", dummy);
-    Ok(dummy)
+#[allow(unused)]
+pub fn create() -> Dummy {
+    Dummy {}
 }

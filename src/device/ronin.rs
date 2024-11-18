@@ -1,11 +1,12 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
 use async_trait::async_trait;
 use btleplug::{
-    api::{bleuuid::uuid_from_u16, Characteristic, Peripheral as _, WriteType},
-    platform::Peripheral,
+    api::{bleuuid::uuid_from_u16, Central as _, Characteristic, Peripheral as _, ScanFilter, WriteType},
+    platform::{Adapter, Peripheral},
 };
 
+pub const SERVICE_UUID: uuid::Uuid = uuid_from_u16(0xfff0);
 pub const CHARACTERISTIC_UUID: uuid::Uuid = uuid_from_u16(0xfff5);
 const CUSTOM_ALG: crc::Algorithm<u16> = crc::Algorithm {
     width: 16,
@@ -60,6 +61,11 @@ fn scale_value(val: f64) -> i16 {
 pub struct Ronin {
     name: String,
     seq: u16,
+    adapter: Adapter,
+    connection: Option<Connection>,
+}
+
+struct Connection {
     peripheral: Peripheral,
     characteristic: Characteristic,
 }
@@ -78,50 +84,94 @@ impl std::fmt::Display for Ronin {
 
 #[async_trait]
 impl super::Device for Ronin {
+    async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("{}: Connecting", self);
+        let peripheral = find_peripheral(&self.adapter, &self.name).await?;
+        peripheral.connect().await?;
+        peripheral.discover_services().await?;
+        let characteristic = match peripheral.characteristics().iter().find(|c| c.uuid == CHARACTERISTIC_UUID) {
+            None => return Err("characteristic not found".into()),
+            Some(x) => x.to_owned(),
+        };
+        self.connection = Some(Connection {
+            peripheral,
+            characteristic,
+        });
+        println!("{}: Connected", self);
+        Ok(())
+    }
+
     async fn disconnect(&mut self) -> Result<(), Box<dyn Error>> {
-        println!("{}: Disconnecting", self);
-        self.peripheral.disconnect().await?;
+        match &self.connection {
+            None => {
+                println!("{}: Already disconnected", self);
+            }
+            Some(c) => {
+                println!("{}: Disconnecting", self);
+                c.peripheral.disconnect().await?;
+                self.connection = None;
+            },
+        }
+        Ok(())
+    }
+
+    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>> {
+        self.disconnect().await?;
+        self.connect().await?;
         Ok(())
     }
 
     async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {
         println!("{}: Received command {:?}", self, command);
-        if command.pan == 0.0 && command.tilt == 0.0 && command.roll == 0.0 {
-            return Ok(());
+        match &self.connection {
+            None => {
+                println!("{}: Not connected", self);
+            }
+            Some(c) => {
+                if command.pan == 0.0 && command.tilt == 0.0 && command.roll == 0.0 {
+                    return Ok(());
+                }
+                let pan_int = scale_value(command.pan);
+                let tilt_int = scale_value(command.tilt);
+                let roll_int = scale_value(command.roll);
+                let content = create_packet(self.seq, pan_int, tilt_int, roll_int);
+                println!("{}: Sending {}", self, hex::encode(&content));
+                c.peripheral.write(&c.characteristic, &content, WriteType::WithoutResponse).await?;
+                self.inc_seq();
+            }
         }
-        let pan_int = scale_value(command.pan);
-        let tilt_int = scale_value(command.tilt);
-        let roll_int = scale_value(command.roll);
-        let content = create_packet(self.seq, pan_int, tilt_int, roll_int);
-        println!("{}: Sending {}", self, hex::encode(&content));
-        self.peripheral
-            .write(&self.characteristic, &content, WriteType::WithoutResponse)
-            .await?;
-        self.inc_seq();
         Ok(())
     }
 }
 
-pub async fn connect(peripheral: Peripheral) -> Result<Ronin, Box<dyn Error>> {
-    let name = peripheral
-        .properties()
-        .await?
-        .and_then(|p| p.local_name)
-        .unwrap_or(peripheral.id().to_string());
-    println!("Ronin[{}]: Connecting", name);
-    peripheral.connect().await?;
-    peripheral.discover_services().await?;
-    let chars = peripheral.characteristics();
-    let characteristic = match chars.iter().find(|c| c.uuid == CHARACTERISTIC_UUID) {
-        None => return Err("characteristic not found".into()),
-        Some(x) => x.to_owned(),
-    };
-    let ronin = Ronin {
+async fn find_peripheral(adapter: &Adapter, name: &str) -> Result<Peripheral, Box<dyn Error>> {
+    adapter.start_scan(ScanFilter { services: [SERVICE_UUID].to_vec() }).await?;
+
+    for _ in 0..4 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let peripherals = adapter.peripherals().await?;
+        for p in peripherals {
+            if p.properties()
+                .await?
+                .and_then(|p| p.local_name)
+                .map(|n| n == name)
+                .unwrap_or(false)
+            {
+                adapter.stop_scan().await?;
+                return Ok(p);
+            }
+        }
+    }
+
+    adapter.stop_scan().await?;
+    Err(format!("unable to find peripheral {}", name).into())
+}
+
+pub fn create(adapter: Adapter, name: String) -> Ronin {
+    Ronin {
         name,
         seq: 0,
-        peripheral,
-        characteristic,
-    };
-    println!("{}: Connected", ronin);
-    Ok(ronin)
+        adapter,
+        connection: None,
+    }
 }

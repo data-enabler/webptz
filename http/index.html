@@ -9,9 +9,13 @@
   <script type="module" src="main.js"></script>
 </head>
 <body>
-  <div class="joystick__frame">
-    <div class="joystick__stick"></div>
+  <div>
+    <button class="device__disconnect">Disconnect</button>
+    <button class="device__reconnect">Reconnect</button>
   </div>
-  <input type="range" class="joystick__zoom" min="-1" max="1" step="0.01">
+  <div class="device__frame">
+    <div class="device__joystick"></div>
+  </div>
+  <input type="range" class="device__zoom" min="-1" max="1" step="0.01">
 </body>
 </html>

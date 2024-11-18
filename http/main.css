@@ -2,7 +2,7 @@
   --size: 200px;
 }
 
-.joystick__frame {
+.device__frame {
   display: inline-block;
   position: relative;
   width: var(--size);
@@ -14,7 +14,7 @@
   border-radius: 50%;
 }
 
-.joystick__stick {
+.device__joystick {
   position: absolute;
   left: 50%;
   bottom: 50%;
@@ -26,7 +26,7 @@
   transform: translate(-50%, 50%);
 }
 
-.joystick__zoom {
+.device__zoom {
   height: var(--size);
 
   writing-mode: vertical-lr;

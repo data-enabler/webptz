@@ -18,5 +18,14 @@ pub struct Command {
 #[async_trait]
 pub trait Device: std::fmt::Display {
     async fn send_command(self: &mut Self, command: Command) -> Result<(), Box<dyn Error>>;
+
+    async fn connect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+
     async fn disconnect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+
+    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+
+    fn name(self: &Self) -> String {
+        format!("{}", self)
+    }
 }

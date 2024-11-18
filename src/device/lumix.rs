@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Duration};
+use std::{error::Error, fmt::Display, time::Duration};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -8,18 +8,18 @@ const APP_UUID: &str = "52D5842E-90C6-4846-9665-C238229D22E9";
 const APP_NAME: &str = "LUMIXTether";
 
 trait WriteExt {
-    async fn write_data(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
+    async fn write_data(&mut self, data: &[u8]) -> Result<(), Box<dyn Error>>;
 
-    async fn write_and_read_resp(&mut self, data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
+    async fn write_and_read_resp(&mut self, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>>;
 }
 
 impl WriteExt for TcpStream {
-    async fn write_data(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    async fn write_data(&mut self, data: &[u8]) -> Result<(), Box<dyn Error>> {
         self.write_all(data).await?;
         Ok(())
     }
 
-    async fn write_and_read_resp(&mut self, data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    async fn write_and_read_resp(&mut self, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         self.write_data(data).await?;
         let mut buffer: [u8; 1024] = [0; 1024];
         let len = self.read(&mut buffer).await?;
@@ -175,13 +175,13 @@ impl ZoomStopDataPacket {
 }
 
 pub struct Lumix {
-    #[allow(unused)]
-    address: String,
-    #[allow(unused)]
-    password: Option<String>,
-    #[allow(unused)]
-    port: u16,
     name: String,
+    address: String,
+    password: Option<String>,
+    connection: Option<Connection>,
+}
+
+struct Connection{
     socket: TcpStream,
     event_socket: TcpStream,
     curr_transaction_id: u32,
@@ -189,38 +189,28 @@ pub struct Lumix {
     curr_speed: u16,
 }
 
-impl Lumix {
-    async fn transaction(&mut self, cmd: CommandPacket, data: DataPacket) -> Result<(), Box<dyn std::error::Error>> {
-        println!("{}: Sending {}", self, cmd);
+impl Connection {
+    async fn transaction(&mut self, name: &str, cmd: CommandPacket, data: DataPacket) -> Result<(), Box<dyn Error>> {
+        println!("{}: Sending {}", name, cmd);
         self.socket.write_data(&bincode::serialize(&cmd).unwrap()).await?;
         let serialized_data = match data {
             DataPacket::ZoomStart(data) => {
-                println!("{}: Sending {}", self, data);
+                println!("{}: Sending {}", name, data);
                 bincode::serialize(&data).unwrap()
             },
             DataPacket::ZoomStop(data) => {
-                println!("{}: Sending {}", self, data);
+                println!("{}: Sending {}", name, data);
                 bincode::serialize(&data).unwrap()
             },
         };
         let resp = self.socket.write_and_read_resp(&serialized_data).await?;
-        println!("{}: Received {}", self, hex::encode(resp));
+        println!("{}: Received {}", name, hex::encode(resp));
         self.curr_transaction_id += 1;
         Ok(())
     }
-}
 
-impl std::fmt::Display for Lumix {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Lumix[{}]", self.name)
-    }
-}
-
-#[async_trait]
-impl super::Device for Lumix {
-
-    async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn std::error::Error>> {
-        println!("{}: Received command {:?}", self, command);
+    async fn send_command_internal(&mut self, name: &str, command: super::Command) -> Result<(), Box<dyn Error>> {
+        println!("{}: Received command {:?}", name, command);
         let dir = match command.zoom {
             x if x < 0.0 => 0x00,
             x if x > 0.0 => 0x01,
@@ -240,25 +230,124 @@ impl super::Device for Lumix {
         if self.curr_speed != 0 {
             let stop_cmd = CommandPacket::stop_zoom(self.curr_transaction_id);
             let stop_data = ZoomStopDataPacket::create(self.curr_transaction_id, stop_cmd.param1);
-            self.transaction(stop_cmd, DataPacket::ZoomStop(stop_data)).await?;
+            self.transaction(name, stop_cmd, DataPacket::ZoomStop(stop_data)).await?;
         }
 
         if speed != 0 {
             let start_cmd = CommandPacket::start_zoom(self.curr_transaction_id);
             let start_data = ZoomStartDataPacket::create(self.curr_transaction_id, start_cmd.param1, dir, speed);
-            self.transaction(start_cmd, DataPacket::ZoomStart(start_data)).await?;
+            self.transaction(name, start_cmd, DataPacket::ZoomStart(start_data)).await?;
         }
 
         self.curr_dir = dir;
         self.curr_speed = speed;
         Ok(())
     }
+}
 
-    async fn disconnect(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("{}: Disconnecting", self);
-        self.socket.shutdown().await?;
-        self.event_socket.shutdown().await?;
+impl std::fmt::Display for Lumix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Lumix[{}]", self.name)
+    }
+}
+
+#[async_trait]
+impl super::Device for Lumix {
+
+    async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("{}: Connecting", self);
+
+        let info_resp = reqwest::get(format!("http://{}:60606/PTPRemote/Server0/ddd", &self.address))
+            .await?
+            .text()
+            .await?;
+        let camera_info: CameraInfo = quick_xml::de::from_str(&info_resp)?;
+        let name = camera_info.device.friendly_name.clone();
+        // TODO: Get port from camera (requires being able to parse namespaced tags)
+        let port: u16 = 15740;
+
+        let acc_resp = reqwest::get(format!(
+            "http://{}/cam.cgi?mode=accctrl&type=req_acc_a&value={}&value2={}{}",
+            &self.address,
+            APP_UUID,
+            APP_NAME,
+            &self.password.clone().map(|p| format!("&value3={}", p)).unwrap_or_default(),
+        ))
+        .await?
+        .text()
+        .await?;
+
+        if !acc_resp.contains("<result>ok</result>") {
+            return Err(acc_resp.into());
+        }
+
+        let mut socket = create_socket(&self.address, port).await?;
+
+        let init_cmd = hex::decode(format!("34000000_01000000_ffffffffffffffffffffffffffffffff_{}_00000100", hex::encode(encode_str(APP_NAME))).replace("_", "")).unwrap();
+        socket.write_and_read_resp(&init_cmd).await?;
+
+        let mut event_socket = create_socket(&self.address, port).await?;
+
+        let init_event = hex::decode("0c000000_03000000_01000000".replace("_", "")).unwrap();
+        event_socket.write_and_read_resp(&init_event).await?;
+
+        let open_session_cmd = CommandPacket::open_session(0);
+        socket.write_and_read_resp(&bincode::serialize(&open_session_cmd).unwrap()).await?;
+
+        self.name = name;
+        self.connection = Some(Connection {
+            socket,
+            event_socket,
+            curr_transaction_id: 1,
+            curr_dir: 0,
+            curr_speed: 0,
+        });
+        println!("{}: Connected", self);
         Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<(), Box<dyn Error>> {
+        let name = self.name();
+        match &mut self.connection {
+            None => {
+                println!("{}: Already disconnected", name);
+            }
+            Some(ref mut c) => {
+                println!("{}: Disconnecting", name);
+                c.socket.shutdown().await?;
+                c.event_socket.shutdown().await?;
+                self.connection = None;
+            },
+        }
+        Ok(())
+    }
+
+    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>> {
+        self.disconnect().await?;
+        self.connect().await?;
+        Ok(())
+    }
+
+    async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {
+        let name = self.name();
+        match &mut self.connection {
+            None => {
+                println!("{}: Not connected", name);
+            },
+            Some(ref mut c) => {
+                c.send_command_internal(&name, command).await?;
+            },
+        }
+        Ok(())
+    }
+}
+
+pub fn create(address: &str, password: Option<String>) -> Lumix {
+    Lumix {
+        name: address.to_string(),
+        address: address.to_string(),
+        password,
+        connection: None,
     }
 }
 
@@ -276,61 +365,6 @@ struct CameraInfo {
     device: DeviceInfo,
 }
 
-pub async fn connect(address: String, password: Option<String>) -> Result<Lumix, Box<dyn std::error::Error>> {
-    println!("Lumix[{}]: Connecting", address);
-
-    let info_resp = reqwest::get(format!("http://{}:60606/PTPRemote/Server0/ddd", address))
-        .await?
-        .text()
-        .await?;
-    let camera_info: CameraInfo = quick_xml::de::from_str(&info_resp)?;
-    let name = camera_info.device.friendly_name.clone();
-    // TODO: Get port from camera (requires being able to parse namespaced tags)
-    let port: u16 = 15740;
-
-    let acc_resp = reqwest::get(format!(
-        "http://{}/cam.cgi?mode=accctrl&type=req_acc_a&value={}&value2={}{}",
-        address,
-        APP_UUID,
-        APP_NAME,
-        password.clone().map(|p| format!("&value3={}", p)).unwrap_or_default(),
-    ))
-    .await?
-    .text()
-    .await?;
-
-    if !acc_resp.contains("<result>ok</result>") {
-        return Err(acc_resp.into());
-    }
-
-    let mut socket = create_socket(address.to_string(), port).await?;
-
-    let init_cmd = hex::decode(format!("34000000_01000000_ffffffffffffffffffffffffffffffff_{}_00000100", hex::encode(encode_str(APP_NAME))).replace("_", "")).unwrap();
-    socket.write_and_read_resp(&init_cmd).await?;
-
-    let mut event_socket = create_socket(address.to_string(), port).await?;
-
-    let init_event = hex::decode("0c000000_03000000_01000000".replace("_", "")).unwrap();
-    event_socket.write_and_read_resp(&init_event).await?;
-
-    let open_session_cmd = CommandPacket::open_session(0);
-    socket.write_and_read_resp(&bincode::serialize(&open_session_cmd).unwrap()).await?;
-
-    let lumix = Lumix {
-        address,
-        password,
-        port,
-        name,
-        socket,
-        event_socket,
-        curr_transaction_id: 1,
-        curr_dir: 0,
-        curr_speed: 0,
-    };
-    println!("{}: Connected", lumix);
-    Ok(lumix)
-}
-
 fn encode_str(s: &str) -> Vec<u8> {
     let mut as_utf16: Vec<u16> = s.encode_utf16().collect();
     as_utf16.push(0x0000);
@@ -344,7 +378,7 @@ fn test_encode_str() {
     assert_eq!(hex::encode(as_bytes), "4c0055004d00490058005400650074006800650072000000");
 }
 
-async fn create_socket(address: String, port: u16) -> io::Result<TcpStream> {
+async fn create_socket(address: &str, port: u16) -> io::Result<TcpStream> {
     let stream = TcpStream::connect((address, port)).await?;
 
     let sock_ref = socket2::SockRef::from(&stream);

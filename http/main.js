@@ -2,8 +2,10 @@ const POLLING_RATE = 200;
 const DEADZONE = 0.1;
 
 const websocket = new WebSocket("/control");
-const visualizer = /** @type {HTMLElement} */ (document.querySelectorAll('.joystick__stick')[0]);
-const zoomSlider = /** @type {HTMLInputElement} */ (document.querySelectorAll('.joystick__zoom')[0]);
+const visualizer = /** @type {HTMLElement} */ (document.querySelectorAll('.device__joystick')[0]);
+const zoomSlider = /** @type {HTMLInputElement} */ (document.querySelectorAll('.device__zoom')[0]);
+const disconnectButton = /** @type {HTMLButtonElement} */ (document.querySelectorAll('.device__disconnect')[0]);
+const reconnectButton = /** @type {HTMLButtonElement} */ (document.querySelectorAll('.device__reconnect')[0]);
 
 /**
  * @typedef {{
@@ -99,7 +101,7 @@ function pollGamepad(pad) {
     return;
   }
   console.log(data);
-  websocket.send(JSON.stringify(data));
+  websocket.send(JSON.stringify({ command: data }));
   lastData = data;
 }
 
@@ -112,4 +114,9 @@ function isZero(data) {
 }
 
 window.setInterval(pollGamepads, POLLING_RATE);
-
+disconnectButton.addEventListener('click', () => {
+  websocket.send(JSON.stringify({ disconnect: { devices: [] } }));
+});
+reconnectButton.addEventListener('click', () => {
+  websocket.send(JSON.stringify({ reconnect: { devices: [] } }));
+});

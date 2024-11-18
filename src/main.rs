@@ -4,8 +4,8 @@ use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
 use axum_extra::{headers, TypedHeader};
-use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
-use btleplug::platform::{Adapter, Manager, Peripheral};
+use btleplug::api::{Central, Manager as _};
+use btleplug::platform::Manager;
 use device::Device;
 use futures::{future, StreamExt};
 use serde::Deserialize;
@@ -22,26 +22,72 @@ use tower_http::services::ServeDir;
 mod device;
 
 enum Operation {
-    Command(ControlRequest),
+    Command(CommandRequest),
+    Disconnect(DisconnectRequest),
+    Reconnect(ReconnectRequest),
     Shutdown,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let manager = Manager::new().await?;
+
+    let adapters = manager.adapters().await?;
+    let central = match adapters.into_iter().nth(0) {
+        None => return Err("no bluetooth adapter found".into()),
+        Some(x) => x,
+    };
+    let info = central.adapter_info().await?;
+    println!("Using adapter: {}", info);
+
     let (command_tx, mut command_rx) = mpsc::unbounded_channel::<Operation>();
 
     tokio::spawn(web_server(command_tx));
 
     let mut devices: Vec<Box<dyn Device>> = vec![];
-    get_devices(&mut devices).await.unwrap();
+
+    let mut ronin = device::ronin::create(central, "DJI RSC 2-080NH8".to_string());
+    ronin.connect().await?;
+    devices.push(Box::new(ronin));
+
+    let mut lumix = device::lumix::create("192.168.88.16", Some("ED8834C9E19D27EA".to_string()));
+    lumix.connect().await?;
+    devices.push(Box::new(lumix));
+
     while let Some(operation) = command_rx.recv().await {
         match operation {
             Operation::Command(request) => {
-                println!("Sending command: {:?} to cameras {:?}", request.command, request.devices);
+                println!("Sending command {:?} to cameras {:?}", request.command, request.devices);
                 // for now, just send to all devices
                 for device in devices.iter_mut() {
                     match device.send_command(request.command).await {
                         Err(e) => println!("Error sending command: {}", e),
+                        _ => (),
+                    }
+                }
+            }
+            Operation::Disconnect(request) => {
+                println!("Disconnecting cameras {:?}", request.devices);
+                // for now, just disconnect all Lumix devices
+                for device in devices.iter_mut() {
+                    if !device.name().starts_with("Lumix") {
+                        continue;
+                    }
+                    match device.disconnect().await {
+                        Err(e) => println!("Error disconnecting device: {}", e),
+                        _ => (),
+                    }
+                }
+            }
+            Operation::Reconnect(request) => {
+                println!("Reconnecting cameras {:?}", request.devices);
+                // for now, just reconnect all Lumix devices
+                for device in devices.iter_mut() {
+                    if !device.name().starts_with("Lumix") {
+                        continue;
+                    }
+                    match device.reconnect().await {
+                        Err(e) => println!("Error reconnecting device: {}", e),
                         _ => (),
                     }
                 }
@@ -95,34 +141,6 @@ async fn web_server(
     command_tx.send(Operation::Shutdown).unwrap();
 }
 
-async fn get_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<dyn Error>> {
-    let manager = Manager::new().await?;
-
-    let adapters = manager.adapters().await?;
-    let central = match adapters.into_iter().nth(0) {
-        None => return Err("no bluetooth adapter found".into()),
-        Some(x) => x,
-    };
-    let info = central.adapter_info().await?;
-    println!("Using adapter: {}", info);
-
-    central.start_scan(ScanFilter::default()).await?;
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    central.stop_scan().await?;
-
-    let device: Box<dyn device::Device> = match find_gimbal(&central).await {
-        // None => return Err("no gimbal found".into()),
-        None => Box::new(device::dummy::connect().await?),
-        Some(x) => Box::new(device::ronin::connect(x).await?),
-    };
-    devices.push(device);
-
-    let lumix = device::lumix::connect("192.168.88.16".to_string(), Some("ED8834C9E19D27EA".to_string())).await?;
-    devices.push(Box::new(lumix));
-
-    Ok(())
-}
-
 async fn ws_handler(
     command_tx: mpsc::UnboundedSender<Operation>,
     ws: WebSocketUpgrade,
@@ -163,15 +181,20 @@ fn process_message(
 ) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            let r: ControlRequest = match serde_json::from_str(&t) {
+            let r: Request = match serde_json::from_str(&t) {
                 Ok(x) => x,
                 Err(e) => {
                     println!(">>> {who} sent invalid json: {e}");
                     return ControlFlow::Continue(());
                 }
             };
-            println!(">>> {who} sent command: {r:?}");
-            match command_tx.send(Operation::Command(r)) {
+            println!(">>> {who} sent request: {r:?}");
+            let op = match r {
+                Request::Command(x) => Operation::Command(x),
+                Request::Disconnect(x) => Operation::Disconnect(x),
+                Request::Reconnect(x) => Operation::Reconnect(x),
+            };
+            match command_tx.send(op) {
                 Ok(_) => (),
                 Err(e) => {
                     println!("failed to queue command: {e}");
@@ -196,10 +219,30 @@ fn process_message(
 }
 
 #[derive(Deserialize, Debug)]
-struct ControlRequest {
+enum Request {
+    #[serde(rename="command")]
+    Command(CommandRequest),
+    #[serde(rename="disconnect")]
+    Disconnect(DisconnectRequest),
+    #[serde(rename="reconnect")]
+    Reconnect(ReconnectRequest),
+}
+
+#[derive(Deserialize, Debug)]
+struct CommandRequest {
     devices: Vec<String>,
     #[serde(flatten)]
     command: device::Command,
+}
+
+#[derive(Deserialize, Debug)]
+struct DisconnectRequest {
+    devices: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct ReconnectRequest {
+    devices: Vec<String>,
 }
 
 async fn shutdown_signal() {
@@ -228,20 +271,4 @@ async fn shutdown_signal() {
             println!("Terminate received");
         },
     }
-}
-
-async fn find_gimbal(central: &Adapter) -> Option<Peripheral> {
-    for p in central.peripherals().await.unwrap() {
-        if p.properties()
-            .await
-            .unwrap()
-            .unwrap()
-            .local_name
-            .iter()
-            .any(|name| name.contains("DJI"))
-        {
-            return Some(p);
-        }
-    }
-    None
 }
