@@ -2,7 +2,9 @@ use std::error::Error;
 
 use async_trait::async_trait;
 
-pub struct Dummy {}
+pub struct Dummy {
+    id: String,
+}
 
 impl std::fmt::Display for Dummy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -32,9 +34,15 @@ impl super::Device for Dummy {
         self.connect().await?;
         Ok(())
     }
+
+    fn id(&self) -> String {
+        self.id.clone()
+    }
 }
 
 #[allow(unused)]
 pub fn create() -> Dummy {
-    Dummy {}
+    Dummy {
+        id: uuid::Uuid::new_v4().to_string(),
+    }
 }

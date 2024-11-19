@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use tower_http::services::ServeDir;
 
 mod device;
+mod config;
 
 enum Operation {
     Command(CommandRequest),
@@ -30,6 +31,9 @@ enum Operation {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let config = config::load_config().await?;
+    println!("Config: {:?}", config);
+
     let manager = Manager::new().await?;
 
     let adapters = manager.adapters().await?;
@@ -42,17 +46,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command_tx, mut command_rx) = mpsc::unbounded_channel::<Operation>();
 
+    let mut devices = config.devices.iter().map(|(id, device_config)| {
+        let device: Box<dyn Device> = match device_config {
+            config::DeviceConfig::Ronin(ronin_config) => {
+                let ronin = device::ronin::create(id, central.clone(), &ronin_config.name);
+                Box::new(ronin)
+            },
+            config::DeviceConfig::Lumix(lumix_config) => {
+                let lumix = device::lumix::create(id, &lumix_config.address.clone(), lumix_config.password.clone());
+                Box::new(lumix)
+            },
+        };
+        return device;
+    }).collect::<Vec<Box<dyn Device>>>();
+
+    for device in devices.iter_mut() {
+        device.connect().await?;
+    }
+
     tokio::spawn(web_server(command_tx));
-
-    let mut devices: Vec<Box<dyn Device>> = vec![];
-
-    let mut ronin = device::ronin::create(central, "DJI RSC 2-080NH8".to_string());
-    ronin.connect().await?;
-    devices.push(Box::new(ronin));
-
-    let mut lumix = device::lumix::create("192.168.88.16", Some("ED8834C9E19D27EA".to_string()));
-    lumix.connect().await?;
-    devices.push(Box::new(lumix));
 
     while let Some(operation) = command_rx.recv().await {
         match operation {

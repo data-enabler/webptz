@@ -175,6 +175,7 @@ impl ZoomStopDataPacket {
 }
 
 pub struct Lumix {
+    id: String,
     name: String,
     address: String,
     password: Option<String>,
@@ -253,6 +254,9 @@ impl std::fmt::Display for Lumix {
 
 #[async_trait]
 impl super::Device for Lumix {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
 
     async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
         println!("{}: Connecting", self);
@@ -342,10 +346,11 @@ impl super::Device for Lumix {
     }
 }
 
-pub fn create(address: &str, password: Option<String>) -> Lumix {
+pub fn create(id: &str, address: &str, password: Option<String>) -> Lumix {
     Lumix {
-        name: address.to_string(),
-        address: address.to_string(),
+        id: id.to_owned(),
+        name: address.to_owned(),
+        address: address.to_owned(),
         password,
         connection: None,
     }

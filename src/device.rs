@@ -28,4 +28,6 @@ pub trait Device: std::fmt::Display {
     fn name(self: &Self) -> String {
         format!("{}", self)
     }
+
+    fn id(self: &Self) -> String;
 }

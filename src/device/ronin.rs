@@ -59,6 +59,7 @@ fn scale_value(val: f64) -> i16 {
 }
 
 pub struct Ronin {
+    id: String,
     name: String,
     seq: u16,
     adapter: Adapter,
@@ -84,6 +85,10 @@ impl std::fmt::Display for Ronin {
 
 #[async_trait]
 impl super::Device for Ronin {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
     async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
         println!("{}: Connecting", self);
         let peripheral = find_peripheral(&self.adapter, &self.name).await?;
@@ -167,9 +172,10 @@ async fn find_peripheral(adapter: &Adapter, name: &str) -> Result<Peripheral, Bo
     Err(format!("unable to find peripheral {}", name).into())
 }
 
-pub fn create(adapter: Adapter, name: String) -> Ronin {
+pub fn create(id: &str, adapter: Adapter, name: &str) -> Ronin {
     Ronin {
-        name,
+        id: id.to_owned(),
+        name: name.to_owned(),
         seq: 0,
         adapter,
         connection: None,
