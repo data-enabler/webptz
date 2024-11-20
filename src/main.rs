@@ -146,7 +146,7 @@ async fn web_server(
         ))
         .route("/control", any(|ws, user_agent, info| ws_handler(cloned_tx, ws, user_agent, info)));
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8000")
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
         .await
         .unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
