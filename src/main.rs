@@ -1,5 +1,6 @@
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{ConnectInfo, WebSocketUpgrade};
+use axum::http::{header, HeaderValue};
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
@@ -11,6 +12,7 @@ use futures::{future, StreamExt};
 use serde::Deserialize;
 use tokio::signal;
 use tokio::sync::mpsc;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use std::error::Error;
@@ -138,6 +140,10 @@ async fn web_server(
     let cloned_tx = command_tx.clone();
     let app = Router::new()
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache"),
+        ))
         .route("/control", any(|ws, user_agent, info| ws_handler(cloned_tx, ws, user_agent, info)));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8000")

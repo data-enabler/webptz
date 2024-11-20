@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, error::Error};
 
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Config {
   pub devices: HashMap<String, DeviceConfig>,
 }

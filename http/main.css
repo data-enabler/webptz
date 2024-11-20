@@ -1,8 +1,11 @@
 :root {
   --size: 200px;
+  --pan: 0;
+  --tilt: 0;
+  --roll: 0;
 }
 
-.device__frame {
+.control__frame {
   display: inline-block;
   position: relative;
   width: var(--size);
@@ -14,19 +17,24 @@
   border-radius: 50%;
 }
 
-.device__joystick {
+.control__joystick {
+  --thumb-size: 32px;
   position: absolute;
   left: 50%;
   bottom: 50%;
-  width: 32px;
-  height: 32px;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
 
   border-radius: 50%;
   background: black;
-  transform: translate(-50%, 50%);
+  transform: translate(
+    calc(-50% + 0.5 * var(--pan) * calc(var(--size) - var(--thumb-size))),
+    calc(50% + -0.5 * var(--tilt) * calc(var(--size) - var(--thumb-size)))
+  );
+  transition: transform linear 0.0333s;
 }
 
-.device__zoom {
+.control__zoom {
   height: var(--size);
 
   writing-mode: vertical-lr;
