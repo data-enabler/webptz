@@ -2,7 +2,10 @@ use std::{error::Error, time::Duration};
 
 use async_trait::async_trait;
 use btleplug::{
-    api::{bleuuid::uuid_from_u16, Central as _, Characteristic, Peripheral as _, ScanFilter, WriteType},
+    api::{
+        bleuuid::uuid_from_u16, Central as _, Characteristic, Peripheral as _, ScanFilter,
+        WriteType,
+    },
     platform::{Adapter, Peripheral},
 };
 
@@ -94,7 +97,11 @@ impl super::Device for Ronin {
         let peripheral = find_peripheral(&self.adapter, &self.name).await?;
         peripheral.connect().await?;
         peripheral.discover_services().await?;
-        let characteristic = match peripheral.characteristics().iter().find(|c| c.uuid == CHARACTERISTIC_UUID) {
+        let characteristic = match peripheral
+            .characteristics()
+            .iter()
+            .find(|c| c.uuid == CHARACTERISTIC_UUID)
+        {
             None => return Err("characteristic not found".into()),
             Some(x) => x.to_owned(),
         };
@@ -116,7 +123,7 @@ impl super::Device for Ronin {
                 c.peripheral.disconnect().await?;
                 self.connection = None;
                 println!("{}: Disconnected", self);
-            },
+            }
         }
         Ok(())
     }
@@ -146,7 +153,9 @@ impl super::Device for Ronin {
                 let roll_int = scale_value(command.roll);
                 let content = create_packet(self.seq, pan_int, tilt_int, roll_int);
                 println!("{}: Sending {}", self, hex::encode(&content));
-                c.peripheral.write(&c.characteristic, &content, WriteType::WithoutResponse).await?;
+                c.peripheral
+                    .write(&c.characteristic, &content, WriteType::WithoutResponse)
+                    .await?;
                 self.inc_seq();
             }
         }
@@ -155,7 +164,11 @@ impl super::Device for Ronin {
 }
 
 async fn find_peripheral(adapter: &Adapter, name: &str) -> Result<Peripheral, Box<dyn Error>> {
-    adapter.start_scan(ScanFilter { services: [SERVICE_UUID].to_vec() }).await?;
+    adapter
+        .start_scan(ScanFilter {
+            services: [SERVICE_UUID].to_vec(),
+        })
+        .await?;
 
     for _ in 0..4 {
         tokio::time::sleep(Duration::from_millis(500)).await;

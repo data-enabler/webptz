@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 pub mod dummy;
-pub mod ronin;
 pub mod lumix;
+pub mod ronin;
 
 #[derive(Deserialize, Debug, Copy, Clone)]
 pub struct Command {

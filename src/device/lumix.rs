@@ -3,7 +3,10 @@ use std::{error::Error, fmt::Display, time::Duration};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tokio::{io::{self, AsyncReadExt as _, AsyncWriteExt as _}, net::TcpStream};
+use tokio::{
+    io::{self, AsyncReadExt as _, AsyncWriteExt as _},
+    net::TcpStream,
+};
 
 const APP_UUID: &str = "52D5842E-90C6-4846-9665-C238229D22E9";
 const APP_NAME: &str = "LUMIXTether";
@@ -46,7 +49,17 @@ pub struct CommandPacket {
 impl Display for CommandPacket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cmd_hex = hex::encode(bincode::serialize(&self).unwrap());
-        write!(f, "{} {} {} {} {} {} {}", &cmd_hex[0..8], &cmd_hex[8..16], &cmd_hex[16..24], &cmd_hex[24..28], &cmd_hex[28..36], &cmd_hex[36..44], &cmd_hex[44..])
+        write!(
+            f,
+            "{} {} {} {} {} {} {}",
+            &cmd_hex[0..8],
+            &cmd_hex[8..16],
+            &cmd_hex[16..24],
+            &cmd_hex[24..28],
+            &cmd_hex[28..36],
+            &cmd_hex[36..44],
+            &cmd_hex[44..]
+        )
     }
 }
 
@@ -120,7 +133,17 @@ pub struct ZoomStartDataPacket {
 impl Display for ZoomStartDataPacket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let data_hex = hex::encode(bincode::serialize(&self).unwrap());
-        write!(f, "{} {} {} {} {} {} {}", &data_hex[0..8], &data_hex[8..16], &data_hex[16..24], &data_hex[24..40], &data_hex[40..56], &data_hex[56..64], &data_hex[64..])
+        write!(
+            f,
+            "{} {} {} {} {} {} {}",
+            &data_hex[0..8],
+            &data_hex[8..16],
+            &data_hex[16..24],
+            &data_hex[24..40],
+            &data_hex[40..56],
+            &data_hex[56..64],
+            &data_hex[64..]
+        )
     }
 }
 
@@ -156,7 +179,17 @@ struct ZoomStopDataPacket {
 impl Display for ZoomStopDataPacket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let data_hex = hex::encode(bincode::serialize(&self).unwrap());
-        write!(f, "{} {} {} {} {} {} {}", &data_hex[0..8], &data_hex[8..16], &data_hex[16..24], &data_hex[24..40], &data_hex[40..56], &data_hex[56..64], &data_hex[64..])
+        write!(
+            f,
+            "{} {} {} {} {} {} {}",
+            &data_hex[0..8],
+            &data_hex[8..16],
+            &data_hex[16..24],
+            &data_hex[24..40],
+            &data_hex[40..56],
+            &data_hex[56..64],
+            &data_hex[64..]
+        )
     }
 }
 
@@ -183,7 +216,7 @@ pub struct Lumix {
     connection: Option<Connection>,
 }
 
-struct Connection{
+struct Connection {
     socket: TcpStream,
     event_socket: TcpStream,
     curr_transaction_id: u32,
@@ -192,18 +225,25 @@ struct Connection{
 }
 
 impl Connection {
-    async fn transaction(&mut self, name: &str, cmd: CommandPacket, data: DataPacket) -> Result<(), Box<dyn Error>> {
+    async fn transaction(
+        &mut self,
+        name: &str,
+        cmd: CommandPacket,
+        data: DataPacket,
+    ) -> Result<(), Box<dyn Error>> {
         println!("{}: Sending {}", name, cmd);
-        self.socket.write_data(&bincode::serialize(&cmd).unwrap()).await?;
+        self.socket
+            .write_data(&bincode::serialize(&cmd).unwrap())
+            .await?;
         let serialized_data = match data {
             DataPacket::ZoomStart(data) => {
                 println!("{}: Sending {}", name, data);
                 bincode::serialize(&data).unwrap()
-            },
+            }
             DataPacket::ZoomStop(data) => {
                 println!("{}: Sending {}", name, data);
                 bincode::serialize(&data).unwrap()
-            },
+            }
         };
         let resp = self.socket.write_and_read_resp(&serialized_data).await?;
         println!("{}: Received {}", name, hex::encode(resp));
@@ -211,7 +251,11 @@ impl Connection {
         Ok(())
     }
 
-    async fn send_command_internal(&mut self, name: &str, command: super::Command) -> Result<(), Box<dyn Error>> {
+    async fn send_command_internal(
+        &mut self,
+        name: &str,
+        command: super::Command,
+    ) -> Result<(), Box<dyn Error>> {
         println!("{}: Received command {:?}", name, command);
         let dir = match command.zoom {
             x if x < 0.0 => 0x00,
@@ -232,13 +276,16 @@ impl Connection {
         if self.curr_speed != 0 {
             let stop_cmd = CommandPacket::stop_zoom(self.curr_transaction_id);
             let stop_data = ZoomStopDataPacket::create(self.curr_transaction_id, stop_cmd.param1);
-            self.transaction(name, stop_cmd, DataPacket::ZoomStop(stop_data)).await?;
+            self.transaction(name, stop_cmd, DataPacket::ZoomStop(stop_data))
+                .await?;
         }
 
         if speed != 0 {
             let start_cmd = CommandPacket::start_zoom(self.curr_transaction_id);
-            let start_data = ZoomStartDataPacket::create(self.curr_transaction_id, start_cmd.param1, dir, speed);
-            self.transaction(name, start_cmd, DataPacket::ZoomStart(start_data)).await?;
+            let start_data =
+                ZoomStartDataPacket::create(self.curr_transaction_id, start_cmd.param1, dir, speed);
+            self.transaction(name, start_cmd, DataPacket::ZoomStart(start_data))
+                .await?;
         }
 
         self.curr_dir = dir;
@@ -263,7 +310,10 @@ impl super::Device for Lumix {
         println!("{}: Connecting", self);
 
         let info_resp = Client::new()
-            .get(format!("http://{}:60606/PTPRemote/Server0/ddd", &self.address))
+            .get(format!(
+                "http://{}:60606/PTPRemote/Server0/ddd",
+                &self.address
+            ))
             .timeout(Duration::from_secs(5))
             .send()
             .await?
@@ -279,7 +329,11 @@ impl super::Device for Lumix {
             &self.address,
             APP_UUID,
             APP_NAME,
-            &self.password.clone().map(|p| format!("&value3={}", p)).unwrap_or_default(),
+            &self
+                .password
+                .clone()
+                .map(|p| format!("&value3={}", p))
+                .unwrap_or_default(),
         ))
         .await?
         .text()
@@ -291,7 +345,14 @@ impl super::Device for Lumix {
 
         let mut socket = create_socket(&self.address, port).await?;
 
-        let init_cmd = hex::decode(format!("34000000_01000000_ffffffffffffffffffffffffffffffff_{}_00000100", hex::encode(encode_str(APP_NAME))).replace("_", "")).unwrap();
+        let init_cmd = hex::decode(
+            format!(
+                "34000000_01000000_ffffffffffffffffffffffffffffffff_{}_00000100",
+                hex::encode(encode_str(APP_NAME))
+            )
+            .replace("_", ""),
+        )
+        .unwrap();
         socket.write_and_read_resp(&init_cmd).await?;
 
         let mut event_socket = create_socket(&self.address, port).await?;
@@ -300,7 +361,9 @@ impl super::Device for Lumix {
         event_socket.write_and_read_resp(&init_event).await?;
 
         let open_session_cmd = CommandPacket::open_session(0);
-        socket.write_and_read_resp(&bincode::serialize(&open_session_cmd).unwrap()).await?;
+        socket
+            .write_and_read_resp(&bincode::serialize(&open_session_cmd).unwrap())
+            .await?;
 
         self.name = name;
         self.connection = Some(Connection {
@@ -326,7 +389,7 @@ impl super::Device for Lumix {
                 c.event_socket.shutdown().await?;
                 self.connection = None;
                 println!("{}: Disconnected", name);
-            },
+            }
         }
         Ok(())
     }
@@ -346,10 +409,10 @@ impl super::Device for Lumix {
         match &mut self.connection {
             None => {
                 println!("{}: Not connected", name);
-            },
+            }
             Some(ref mut c) => {
                 c.send_command_internal(&name, command).await?;
-            },
+            }
         }
         Ok(())
     }
@@ -367,7 +430,7 @@ pub fn create(id: &str, address: &str, password: Option<String>) -> Lumix {
 
 #[derive(Debug, Deserialize)]
 struct DeviceInfo {
-    #[serde(rename="friendlyName")]
+    #[serde(rename = "friendlyName")]
     friendly_name: String,
     // quick-xml + serde doesn't support namespaces
     // #[serde(name="pana:X_PTPPortNo")]
@@ -389,7 +452,10 @@ fn encode_str(s: &str) -> Vec<u8> {
 #[test]
 fn test_encode_str() {
     let as_bytes = encode_str("LUMIXTether");
-    assert_eq!(hex::encode(as_bytes), "4c0055004d00490058005400650074006800650072000000");
+    assert_eq!(
+        hex::encode(as_bytes),
+        "4c0055004d00490058005400650074006800650072000000"
+    );
 }
 
 async fn create_socket(address: &str, port: u16) -> io::Result<TcpStream> {

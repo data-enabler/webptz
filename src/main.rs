@@ -10,21 +10,21 @@ use btleplug::platform::Manager;
 use device::Device;
 use futures::{future, SinkExt as _, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::signal;
-use tokio::sync::mpsc;
-use tokio::sync::watch;
-use tower_http::set_header::SetResponseHeaderLayer;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::ops::{ControlFlow, Deref};
 use std::path::PathBuf;
+use tokio::signal;
+use tokio::sync::mpsc;
+use tokio::sync::watch;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-mod device;
 mod config;
+mod device;
 
 enum Operation {
     Command(CommandRequest),
@@ -63,19 +63,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command_tx, mut command_rx) = mpsc::unbounded_channel::<Operation>();
 
-    let mut devices = config.devices.iter().map(|(id, device_config)| {
-        let device: Box<dyn Device> = match device_config {
-            config::DeviceConfig::Ronin(ronin_config) => {
-                let ronin = device::ronin::create(id, central.clone(), &ronin_config.name);
-                Box::new(ronin)
-            },
-            config::DeviceConfig::Lumix(lumix_config) => {
-                let lumix = device::lumix::create(id, &lumix_config.address.clone(), lumix_config.password.clone());
-                Box::new(lumix)
-            },
-        };
-        return device;
-    }).collect::<Vec<Box<dyn Device>>>();
+    let mut devices = config
+        .devices
+        .iter()
+        .map(|(id, device_config)| {
+            let device: Box<dyn Device> = match device_config {
+                config::DeviceConfig::Ronin(ronin_config) => {
+                    let ronin = device::ronin::create(id, central.clone(), &ronin_config.name);
+                    Box::new(ronin)
+                }
+                config::DeviceConfig::Lumix(lumix_config) => {
+                    let lumix = device::lumix::create(
+                        id,
+                        &lumix_config.address.clone(),
+                        lumix_config.password.clone(),
+                    );
+                    Box::new(lumix)
+                }
+            };
+            return device;
+        })
+        .collect::<Vec<Box<dyn Device>>>();
 
     match connect_devices(&mut devices).await {
         Err(e) => {
@@ -83,7 +91,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             disconnect_devices(&mut devices).await;
             return Err(e);
         }
-        _ => ()
+        _ => (),
     }
 
     let (state_tx, state_rx) = watch::channel::<State>(State {
@@ -96,7 +104,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     while let Some(operation) = command_rx.recv().await {
         match operation {
             Operation::Command(request) => {
-                println!("Sending command {:?} to cameras {:?}", request.command, request.devices);
+                println!(
+                    "Sending command {:?} to cameras {:?}",
+                    request.command, request.devices
+                );
                 for device in devices.iter_mut() {
                     let id = device.id();
                     if !request.devices.iter().any(|x| x == &id) {
@@ -158,32 +169,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn connect_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<dyn Error>> {
     for device in devices.iter_mut() {
-        device.connect().await.map_err(
-            |e| -> Box<dyn Error> {
-                format!("error connecting to {}: {}", device, e).into()
-            }
-        )?;
+        device.connect().await.map_err(|e| -> Box<dyn Error> {
+            format!("error connecting to {}: {}", device, e).into()
+        })?;
     }
     Ok(())
 }
 
 async fn disconnect_devices(devices: &mut Vec<Box<dyn Device>>) {
     match future::try_join_all(
-        devices.iter_mut()
-        .filter(|d| d.is_connected())
-        .map(|d| d.disconnect())
-    ).await {
+        devices
+            .iter_mut()
+            .filter(|d| d.is_connected())
+            .map(|d| d.disconnect()),
+    )
+    .await
+    {
         Err(e) => println!("Error disconnecting devices: {}", e),
         _ => (),
     }
 }
 
 fn get_device_status(devices: &Vec<Box<dyn Device>>) -> HashMap<String, DeviceStatus> {
-    devices.iter().map(|d| (d.id(), DeviceStatus {
-        id: d.id(),
-        name: d.name(),
-        connected: d.is_connected(),
-    })).collect()
+    devices
+        .iter()
+        .map(|d| {
+            (
+                d.id(),
+                DeviceStatus {
+                    id: d.id(),
+                    name: d.name(),
+                    connected: d.is_connected(),
+                },
+            )
+        })
+        .collect()
 }
 
 async fn web_server(
@@ -213,7 +233,10 @@ async fn web_server(
             header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache"),
         ))
-        .route("/control", any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)));
+        .route(
+            "/control",
+            any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)),
+        );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
         .await
@@ -222,7 +245,8 @@ async fn web_server(
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
-    ).with_graceful_shutdown(shutdown_signal())
+    )
+    .with_graceful_shutdown(shutdown_signal())
     .await
     .unwrap();
     command_tx.send(Operation::Shutdown).unwrap();
@@ -336,18 +360,18 @@ fn process_message(
             }
             return ControlFlow::Break(());
         }
-        _ => ()
+        _ => (),
     }
     ControlFlow::Continue(())
 }
 
 #[derive(Deserialize, Debug)]
 enum Request {
-    #[serde(rename="command")]
+    #[serde(rename = "command")]
     Command(CommandRequest),
-    #[serde(rename="disconnect")]
+    #[serde(rename = "disconnect")]
     Disconnect(DisconnectRequest),
-    #[serde(rename="reconnect")]
+    #[serde(rename = "reconnect")]
     Reconnect(ReconnectRequest),
 }
 
