@@ -3,24 +3,23 @@ import { html, render, useState, useEffect, useRef, useCallback } from 'https://
 // @ts-ignore
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
-const DEADZONE = 0.1;
-const EPSILON = 0.5 * 1/240; // Ideally this would be based on the display refresh rate
-const POLL_INTERVAL = (1/60 - EPSILON) * 1000;
-const SEND_INTERVAL = (1/5 - EPSILON) * 1000;
-
-const websocket = new ReconnectingWebSocket("/control", [], {
-  minReconnectionDelay: 500,
-  maxReconnectionDelay: 8000,
-  reconnectionDelayGrowFactor: 2,
-  maxEnqueuedMessages: 0,
-});
 /**
- * @param {Data} data
+ * @typedef {{
+ *   command: Data,
+ * }} CommandMessage
  */
-function sendCommand(data) {
-  console.log('Sending command', data);
-  websocket.send(JSON.stringify({ command: data }));
-}
+
+/**
+ * @typedef {{
+ *   disconnect: { devices: string[] },
+ * }} DisconnectMessage
+ */
+
+/**
+ * @typedef {{
+ *   reconnect: { devices: string[] },
+ * }} ReconnectMessage
+ */
 
 /**
  * @typedef {{
@@ -34,10 +33,12 @@ function sendCommand(data) {
 
 /**
  * @typedef {{
- *   devices: {
+ *   groups: string[][],
+ *   devices: Record<string, {
  *     id: string,
  *     name: string,
- *   }[],
+ *     connected: boolean,
+ *   }>,
  * }} DeviceGroupState
  */
 
@@ -57,16 +58,32 @@ function sendCommand(data) {
  * }} SendState
  */
 
+const DEADZONE = 0.1;
+const EPSILON = 0.5 * 1/240; // Ideally this would be based on the display refresh rate
+const POLL_INTERVAL = (1/60 - EPSILON) * 1000;
+const SEND_INTERVAL = (1/5 - EPSILON) * 1000;
+const ZERO_STATE = Object.freeze({
+  pan: 0,
+  tilt: 0,
+  roll: 0,
+  zoom: 0,
+});
+
 /**
  * @param {{
  *   groupIds: string[][],
+ *   controlStates: ControlState[],
  *   setControlStates: function(ControlState[]): void,
+ *   send: function(CommandMessage): void,
  * }} props
  */
-function useGamepadPoll({ groupIds, setControlStates }) {
+function useGamepadPoll({ groupIds, setControlStates, send }) {
   const requestRef = useRef();
   const lastPoll = useRef(document.timeline.currentTime || 0);
+  // Track the send times independently for each device group, so that we can send commands
+  // immediately when they are non-zero
   const lastSends = useRef(/** @type {SendState[]} */([]));
+  const lastStates = useRef(/** @type {ControlState[]} */([]));
   const poll = useCallback(() => {
     requestRef.current = requestAnimationFrame(poll);
     if (document.timeline.currentTime == null) {
@@ -78,9 +95,16 @@ function useGamepadPoll({ groupIds, setControlStates }) {
     }
     lastPoll.current = currentTime;
     const controlStates = readGamepads();
-    setControlStates(controlStates);
+
+    // Limit unnecessary re-renders by only updating state when the values change
+    if (!allStatesEqual(lastStates.current, controlStates)) {
+      setControlStates(controlStates);
+    }
+    lastStates.current = controlStates;
+
     groupIds.forEach((group, i) => {
-      const currState = controlStates[i];
+      /** @type {ControlState} */
+      const currState = controlStates[i] || ZERO_STATE;
       /** @type {Partial<SendState>} */
       const sendState = lastSends.current[i] || {};
       const {
@@ -93,9 +117,11 @@ function useGamepadPoll({ groupIds, setControlStates }) {
       if (isZero(currState) && isZero(lastState)) {
         return;
       }
-      sendCommand({
-        devices: group,
-        ...currState,
+      send({
+        command: {
+          devices: group,
+          ...currState,
+        }
       });
       lastSends.current[i] = {
         lastTimestamp: currentTime,
@@ -109,62 +135,102 @@ function useGamepadPoll({ groupIds, setControlStates }) {
   }, [poll]);
 }
 
-function App() {
-  const groups = [
-    {
-      devices: [
-        {
-          id: 'ronin1',
-          name: 'DJI RSC 2-080NH8',
-        },
-        {
-          id: 'lumix1',
-          name: 'BGH1-LP3',
-        },
-      ],
+/**
+ * @return {{
+ *   state: DeviceGroupState,
+ *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage): void,
+ * }}
+ */
+function useServer() {
+  const [state, setState] = useState(/** @type {DeviceGroupState} */ ({
+    groups: [],
+    devices: {},
+  }));
+  const ws = useRef(null);
+  useEffect(() => {
+    const websocket = new ReconnectingWebSocket("/control", [], {
+      minReconnectionDelay: 500,
+      maxReconnectionDelay: 8000,
+      reconnectionDelayGrowFactor: 2,
+      maxEnqueuedMessages: 0,
+    });
+    websocket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      setState(data);
+    });
+    ws.current = websocket;
+    return () => {
+      ws.current = null;
+      websocket.close();
+    };
+  }, []);
+
+  return {
+    state,
+    send: (data) => {
+      if (!ws.current) {
+        return;
+      }
+      console.log('Sending', data);
+      ws.current.send(JSON.stringify(data));
     },
-  ];
-  const groupIds = [['ronin1', 'lumix1']];
+  }
+}
+
+function App() {
+  const { state, send } = useServer();
+  const [controlStates, setControlStates] = useState(/** @type {ControlState[]} */ (
+    state.groups.map(() => ZERO_STATE)
+  ));
+  useGamepadPoll({
+    groupIds: state.groups,
+    controlStates,
+    setControlStates,
+    send,
+  });
   const onDisconnect = (id) => {
-    websocket.send(JSON.stringify({ disconnect: { devices: [id] } }));
+    send({ disconnect: { devices: [id] } });
   };
   const onReconnect = (id) => {
-    websocket.send(JSON.stringify({ reconnect: { devices: [id] } }));
+    send({ reconnect: { devices: [id] } });
   };
-  const [controlStates, setControlStates] = useState(/** @type {ControlState[]} */ (
-    groups.map(() => ({
-      pan: 0,
-      tilt: 0,
-      roll: 0,
-      zoom: 0,
-    }))
-  ));
-  useGamepadPoll({ groupIds, setControlStates });
 
-  return controlStates.map((s, i) => html`
-    <div class="control"
-      style=${{
-        '--pan': s.pan,
-        '--tilt': s.tilt,
-        '--roll': s.roll,
-      }}
-    >
-      <div>
-        ${groups[i].devices.map((d) => html`
-          <div class="control__device">
-            ${d.name}
-            ${' '}
-            <button onClick=${() => onDisconnect(d.id)}>Disconnect</button>
-            <button onClick=${() => onReconnect(d.id)}>Reconnect</button>
+  return state.groups.map((group, i) => {
+    const s = controlStates[i] || ZERO_STATE;
+    return html`
+      <div class="control"
+        style=${{
+          '--pan': s.pan,
+          '--tilt': s.tilt,
+          '--roll': s.roll,
+          '--zoom': s.zoom,
+        }}
+      >
+        <div>
+          ${group.map((id) => {
+            const d = state.devices[id];
+            return html`
+              <div class="control__device">
+                ${d.name}
+                <br/>
+                <button disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
+                ${' '}
+                <button disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
+              </div>
+            `;
+          })}
+        </div>
+        <div class="control__controls">
+          <div class="control__pt">
+            <div class="control__pt-joystick"></div>
           </div>
-        `)}
+          <div class="control__zoom">
+            <div class="control__zoom-joystick"></div>
+          </div>
+        </div>
       </div>
-      <div class="control__frame">
-        <div class="control__joystick"></div>
-      </div>
-      <input type="range" class="control__zoom" min="-1" max="1" step="0.01" value=${s.zoom} />
-    </div>
-  `);
+    `;
+  });
 }
 
 render(html`<${App} />`, document.body);
@@ -196,14 +262,7 @@ function ignoreDeadzone(val) {
 function readGamepads() {
   const pad = navigator.getGamepads().filter(nonNull)[0];
   if (pad == null) {
-    return [
-      {
-        pan: 0,
-        tilt: 0,
-        roll: 0,
-        zoom: 0,
-      },
-    ];
+    return [ZERO_STATE];
   }
 
   return [readGamepad(pad)];
@@ -248,9 +307,27 @@ function readGamepad(pad) {
 }
 
 /**
+ * @param {ControlState[]} states1
+ * @param {ControlState[]} states2
+ * @returns {boolean}
+ */
+function allStatesEqual(states1, states2) {
+  return states1.length === states2.length && states1.every((state1, i) => statesEqual(state1, states2[i]));
+}
+
+/**
+ * @param {ControlState} state1
+ * @param {ControlState} state2
+ * @returns {boolean}
+ */
+function statesEqual(state1, state2) {
+  return state1.pan === state2.pan && state1.tilt === state2.tilt && state1.roll === state2.roll && state1.zoom === state2.zoom;
+}
+
+/**
  * @param {ControlState} state
  * @returns {boolean}
  */
 function isZero(state) {
-  return state.pan === 0 && state.tilt === 0 && state.roll === 0 && state.zoom === 0;
+  return statesEqual(state, ZERO_STATE);
 }

@@ -1,24 +1,53 @@
 :root {
   --size: 200px;
+  --thumb-size: 20px;
   --pan: 0;
   --tilt: 0;
   --roll: 0;
+  --zoom: 0;
 }
 
-.control__frame {
-  display: inline-block;
+body {
+  display: flex;
+
+  flex-flow: row wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.control {
+  flex: 0 0 auto;
+  border: 1px solid currentColor;
+}
+
+.control__device {
+  padding: 0.3rem;
+  border-bottom: 1px solid currentColor;
+}
+
+button[disabled] {
+  opacity: 0.5;
+}
+
+.control__controls {
+  display: flex;
+  flex-flow: row nowrap;
+}
+
+.control__pt {
   position: relative;
   width: var(--size);
   height: var(--size);
   box-sizing: border-box;
+  flex: 0 0 auto;
+  margin: 0.3rem;
 
   background: gray;
-  border: 16px solid transparent;
+  border: calc(var(--thumb-size) / 2) solid transparent;
   border-radius: 50%;
 }
 
-.control__joystick {
-  --thumb-size: 32px;
+.control__pt-joystick, .control__zoom-joystick {
   position: absolute;
   left: 50%;
   bottom: 50%;
@@ -27,16 +56,32 @@
 
   border-radius: 50%;
   background: black;
+  transition: transform linear 0.0333s;
+}
+
+.control__pt-joystick {
   transform: translate(
     calc(-50% + 0.5 * var(--pan) * calc(var(--size) - var(--thumb-size))),
     calc(50% + -0.5 * var(--tilt) * calc(var(--size) - var(--thumb-size)))
   );
-  transition: transform linear 0.0333s;
 }
 
 .control__zoom {
+  position: relative;
+  width: var(--thumb-size);
   height: var(--size);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  margin: 0.3rem;
 
-  writing-mode: vertical-lr;
-  direction: rtl;
+  background: gray;
+  border: calc(var(--thumb-size) / 2) solid transparent;
+  border-radius: calc(var(--thumb-size) / 2);
+}
+
+.control__zoom-joystick {
+  transform: translate(
+    -50%,
+    calc(50% + -0.5 * var(--zoom) * calc(var(--size) - var(--thumb-size)))
+  );
 }

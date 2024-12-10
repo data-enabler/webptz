@@ -115,6 +115,7 @@ impl super::Device for Ronin {
                 println!("{}: Disconnecting", self);
                 c.peripheral.disconnect().await?;
                 self.connection = None;
+                println!("{}: Disconnected", self);
             },
         }
         Ok(())
@@ -124,6 +125,10 @@ impl super::Device for Ronin {
         self.disconnect().await?;
         self.connect().await?;
         Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connection.is_some()
     }
 
     async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {

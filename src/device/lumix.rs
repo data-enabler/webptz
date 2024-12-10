@@ -1,6 +1,7 @@
 use std::{error::Error, fmt::Display, time::Duration};
 
 use async_trait::async_trait;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::{io::{self, AsyncReadExt as _, AsyncWriteExt as _}, net::TcpStream};
 
@@ -261,7 +262,10 @@ impl super::Device for Lumix {
     async fn connect(&mut self) -> Result<(), Box<dyn Error>> {
         println!("{}: Connecting", self);
 
-        let info_resp = reqwest::get(format!("http://{}:60606/PTPRemote/Server0/ddd", &self.address))
+        let info_resp = Client::new()
+            .get(format!("http://{}:60606/PTPRemote/Server0/ddd", &self.address))
+            .timeout(Duration::from_secs(5))
+            .send()
             .await?
             .text()
             .await?;
@@ -321,6 +325,7 @@ impl super::Device for Lumix {
                 c.socket.shutdown().await?;
                 c.event_socket.shutdown().await?;
                 self.connection = None;
+                println!("{}: Disconnected", name);
             },
         }
         Ok(())
@@ -330,6 +335,10 @@ impl super::Device for Lumix {
         self.disconnect().await?;
         self.connect().await?;
         Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connection.is_some()
     }
 
     async fn send_command(&mut self, command: super::Command) -> Result<(), Box<dyn Error>> {

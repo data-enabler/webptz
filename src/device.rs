@@ -25,6 +25,8 @@ pub trait Device: std::fmt::Display {
 
     async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>>;
 
+    fn is_connected(self: &Self) -> bool;
+
     fn name(self: &Self) -> String {
         format!("{}", self)
     }

@@ -8,16 +8,18 @@ use axum_extra::{headers, TypedHeader};
 use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
 use device::Device;
-use futures::{future, StreamExt};
-use serde::Deserialize;
+use futures::{future, SinkExt as _, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::signal;
 use tokio::sync::mpsc;
+use tokio::sync::watch;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
-use std::ops::ControlFlow;
+use std::ops::{ControlFlow, Deref};
 use std::path::PathBuf;
 use tower_http::services::ServeDir;
 
@@ -29,6 +31,19 @@ enum Operation {
     Disconnect(DisconnectRequest),
     Reconnect(ReconnectRequest),
     Shutdown,
+}
+
+#[derive(Serialize, Debug)]
+struct State {
+    groups: Vec<Vec<String>>,
+    devices: HashMap<String, DeviceStatus>,
+}
+
+#[derive(Serialize, Debug)]
+struct DeviceStatus {
+    id: String,
+    name: String,
+    connected: bool,
 }
 
 #[tokio::main]
@@ -62,18 +77,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return device;
     }).collect::<Vec<Box<dyn Device>>>();
 
-    for device in devices.iter_mut() {
-        device.connect().await?;
+    match connect_devices(&mut devices).await {
+        Err(e) => {
+            println!("{}", e);
+            disconnect_devices(&mut devices).await;
+            return Err(e);
+        }
+        _ => ()
     }
 
-    tokio::spawn(web_server(command_tx));
+    let (state_tx, state_rx) = watch::channel::<State>(State {
+        groups: config.groups.clone(),
+        devices: get_device_status(&devices),
+    });
+
+    tokio::spawn(web_server(command_tx, state_rx));
 
     while let Some(operation) = command_rx.recv().await {
         match operation {
             Operation::Command(request) => {
                 println!("Sending command {:?} to cameras {:?}", request.command, request.devices);
-                // for now, just send to all devices
                 for device in devices.iter_mut() {
+                    let id = device.id();
+                    if !request.devices.iter().any(|x| x == &id) {
+                        continue;
+                    }
                     match device.send_command(request.command).await {
                         Err(e) => println!("Error sending command: {}", e),
                         _ => (),
@@ -82,9 +110,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Operation::Disconnect(request) => {
                 println!("Disconnecting cameras {:?}", request.devices);
-                // for now, just disconnect all Lumix devices
                 for device in devices.iter_mut() {
-                    if !device.name().starts_with("Lumix") {
+                    let id = device.id();
+                    if !request.devices.iter().any(|x| x == &id) {
                         continue;
                     }
                     match device.disconnect().await {
@@ -92,12 +120,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         _ => (),
                     }
                 }
+                state_tx.send_modify(|s| {
+                    s.groups = config.groups.clone();
+                    s.devices = get_device_status(&devices);
+                });
             }
             Operation::Reconnect(request) => {
                 println!("Reconnecting cameras {:?}", request.devices);
-                // for now, just reconnect all Lumix devices
                 for device in devices.iter_mut() {
-                    if !device.name().starts_with("Lumix") {
+                    let id = device.id();
+                    if !request.devices.iter().any(|x| x == &id) {
                         continue;
                     }
                     match device.reconnect().await {
@@ -105,13 +137,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         _ => (),
                     }
                 }
+                state_tx.send_modify(|s| {
+                    s.groups = config.groups.clone();
+                    s.devices = get_device_status(&devices);
+                });
             }
             Operation::Shutdown => {
                 println!("Shutting down...");
-                match future::try_join_all(devices.iter_mut().map(|d| d.disconnect())).await {
-                    Err(e) => println!("Error disconnecting devices: {}", e),
-                    _ => (),
-                }
+                disconnect_devices(&mut devices).await;
+                state_tx.send_modify(|s| {
+                    s.groups = vec![];
+                    s.devices = HashMap::new();
+                });
                 break;
             }
         }
@@ -119,8 +156,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+async fn connect_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<dyn Error>> {
+    for device in devices.iter_mut() {
+        device.connect().await.map_err(
+            |e| -> Box<dyn Error> {
+                format!("error connecting to {}: {}", device, e).into()
+            }
+        )?;
+    }
+    Ok(())
+}
+
+async fn disconnect_devices(devices: &mut Vec<Box<dyn Device>>) {
+    match future::try_join_all(
+        devices.iter_mut()
+        .filter(|d| d.is_connected())
+        .map(|d| d.disconnect())
+    ).await {
+        Err(e) => println!("Error disconnecting devices: {}", e),
+        _ => (),
+    }
+}
+
+fn get_device_status(devices: &Vec<Box<dyn Device>>) -> HashMap<String, DeviceStatus> {
+    devices.iter().map(|d| (d.id(), DeviceStatus {
+        id: d.id(),
+        name: d.name(),
+        connected: d.is_connected(),
+    })).collect()
+}
+
 async fn web_server(
     command_tx: mpsc::UnboundedSender<Operation>,
+    state_rx: watch::Receiver<State>,
 ) {
     tracing_subscriber::registry()
         .with(
@@ -138,13 +206,14 @@ async fn web_server(
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("http");
 
     let cloned_tx = command_tx.clone();
+    let cloned_rx = state_rx.clone();
     let app = Router::new()
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache"),
         ))
-        .route("/control", any(|ws, user_agent, info| ws_handler(cloned_tx, ws, user_agent, info)));
+        .route("/control", any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
         .await
@@ -161,6 +230,7 @@ async fn web_server(
 
 async fn ws_handler(
     command_tx: mpsc::UnboundedSender<Operation>,
+    state_rx: watch::Receiver<State>,
     ws: WebSocketUpgrade,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -172,22 +242,57 @@ async fn ws_handler(
     };
     println!("`{user_agent}` at {addr} connected.");
     // finalize the upgrade process by returning upgrade callback.
-    ws.on_upgrade(move |socket| handle_socket(command_tx, socket, addr))
+    ws.on_upgrade(move |socket| handle_socket(command_tx, state_rx, socket, addr))
 }
 
 async fn handle_socket(
     command_tx: mpsc::UnboundedSender<Operation>,
+    mut state_rx: watch::Receiver<State>,
     socket: WebSocket,
     who: SocketAddr,
 ) {
-    let (_, mut receiver) = socket.split();
-    tokio::spawn(async move {
+    let (mut sender, mut receiver) = socket.split();
+
+    let mut send_task = tokio::spawn(async move {
+        loop {
+            let json = serde_json::to_string(state_rx.borrow_and_update().deref()).unwrap();
+            match sender.send(Message::Text(json)).await {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("failed to send state update: {e}");
+                    break;
+                }
+            }
+            if state_rx.changed().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             if process_message(command_tx.clone(), msg, who).is_break() {
                 break;
             }
         }
     });
+
+    tokio::select! {
+        rv_a = (&mut send_task) => {
+            match rv_a {
+                Ok(_) => (),
+                Err(a) => println!("Error sending messages {a:?}")
+            }
+            recv_task.abort();
+        },
+        rv_b = (&mut recv_task) => {
+            match rv_b {
+                Ok(_) => (),
+                Err(b) => println!("Error receiving messages {b:?}")
+            }
+            send_task.abort();
+        }
+    }
 
     println!("Websocket context {who} destroyed");
 }
