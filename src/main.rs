@@ -68,6 +68,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .iter()
         .map(|(id, device_config)| {
             let device: Box<dyn Device> = match device_config {
+                config::DeviceConfig::Dummy(dummy_config) => {
+                    let dummy = device::dummy::create_with_id_and_name(id, &dummy_config.name);
+                    Box::new(dummy)
+                }
                 config::DeviceConfig::Ronin(ronin_config) => {
                     let ronin = device::ronin::create(id, central.clone(), &ronin_config.name);
                     Box::new(ronin)
@@ -238,9 +242,7 @@ async fn web_server(
             any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(
         listener,

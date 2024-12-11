@@ -14,10 +14,17 @@ pub struct Config {
 
 #[derive(Deserialize, Debug)]
 pub enum DeviceConfig {
+    #[serde(rename = "dummy")]
+    Dummy(DummyConfig),
     #[serde(rename = "ronin")]
     Ronin(RoninConfig),
     #[serde(rename = "lumix")]
     Lumix(LumixConfig),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DummyConfig {
+    pub name: String,
 }
 
 #[derive(Deserialize, Debug)]

@@ -3,6 +3,8 @@ import { html, render, useState, useEffect, useRef, useCallback } from 'https://
 // @ts-ignore
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
+import { GamepadData, Mapping, normalizeGamepad, readInputs } from './mapping.js';
+
 /**
  * @typedef {{
  *   command: Data,
@@ -58,7 +60,6 @@ import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4
  * }} SendState
  */
 
-const DEADZONE = 0.1;
 const EPSILON = 0.5 * 1/240; // Ideally this would be based on the display refresh rate
 const POLL_INTERVAL = (1/60 - EPSILON) * 1000;
 const SEND_INTERVAL = (1/5 - EPSILON) * 1000;
@@ -68,6 +69,37 @@ const ZERO_STATE = Object.freeze({
   roll: 0,
   zoom: 0,
 });
+/** @type {Mapping[]} */
+const MAPPINGS = [
+  {
+    panL: [
+      { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'negative' },
+      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'negative' },
+    ],
+    panR: [
+      { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'positive' },
+      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'positive' },
+    ],
+    tiltU: [
+      { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'negative' },
+      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'negative' },
+    ],
+    tiltD: [
+      { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'positive' },
+      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'positive' },
+    ],
+    rollL: [],
+    rollR: [],
+    zoomI: [
+      { padIndex: 0, type: 'button', inputIndex: 6, sign: 'positive' },
+      { padIndex: 0, type: 'button', inputIndex: 7, sign: 'positive' },
+    ],
+    zoomO: [
+      { padIndex: 0, type: 'button', inputIndex: 4, sign: 'positive' },
+      { padIndex: 0, type: 'button', inputIndex: 5, sign: 'positive' },
+    ],
+  }
+];
 
 /**
  * @param {{
@@ -75,9 +107,10 @@ const ZERO_STATE = Object.freeze({
  *   controlStates: ControlState[],
  *   setControlStates: function(ControlState[]): void,
  *   send: function(CommandMessage): void,
+ *   mappings: Mapping[],
  * }} props
  */
-function useGamepadPoll({ groupIds, setControlStates, send }) {
+function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
   const requestRef = useRef();
   const lastPoll = useRef(document.timeline.currentTime || 0);
   // Track the send times independently for each device group, so that we can send commands
@@ -94,7 +127,7 @@ function useGamepadPoll({ groupIds, setControlStates, send }) {
       return;
     }
     lastPoll.current = currentTime;
-    const controlStates = readGamepads();
+    const controlStates = readGamepads(mappings);
 
     // Limit unnecessary re-renders by only updating state when the values change
     if (!allStatesEqual(lastStates.current, controlStates)) {
@@ -132,7 +165,7 @@ function useGamepadPoll({ groupIds, setControlStates, send }) {
   useEffect(() => {
     requestRef.current = requestAnimationFrame(poll);
     return () => cancelAnimationFrame(requestRef.current);
-  }, [poll]);
+  }, [poll, mappings]);
 }
 
 /**
@@ -187,6 +220,7 @@ function App() {
     controlStates,
     setControlStates,
     send,
+    mappings: MAPPINGS,
   });
   const onDisconnect = (id) => {
     send({ disconnect: { devices: [id] } });
@@ -222,6 +256,7 @@ function App() {
         </div>
         <div class="control__controls">
           <div class="control__pt">
+            <div class="control__pt-bg"></div>
             <div class="control__pt-joystick"></div>
           </div>
           <div class="control__zoom">
@@ -249,54 +284,25 @@ function nonNull(x) {
   return x != null;
 }
 
-function ignoreDeadzone(val) {
-  if (Math.abs(val) < DEADZONE) {
-    return 0;
-  }
-  return val;
-}
-
 /**
+ * @param {Mapping[]} mappings
  * @returns {ControlState[]}
  */
-function readGamepads() {
-  const pad = navigator.getGamepads().filter(nonNull)[0];
-  if (pad == null) {
-    return [ZERO_STATE];
-  }
-
-  return [readGamepad(pad)];
+function readGamepads(mappings) {
+  const pads = navigator.getGamepads().map(normalizeGamepad);
+  return mappings.map(m => readMapping(pads, m));
 }
 
 /**
- * @param {Gamepad} pad
+ * @param {(GamepadData|null)[]} pads
+ * @param {Mapping} mapping
  * @returns {ControlState}
  */
-function readGamepad(pad) {
-  const pan1 = ignoreDeadzone(pad.axes[0]);
-  const tilt1 = ignoreDeadzone(-1 * pad.axes[1]);
-  let zoom1 = ignoreDeadzone(pad.buttons[6].value - pad.buttons[4].value);
-  const pan2 =  ignoreDeadzone(pad.axes[2]);
-  let tilt2 = ignoreDeadzone(-1 * pad.axes[3]);
-  let zoom2 = ignoreDeadzone(pad.buttons[7].value - pad.buttons[5].value);
-
-  // Doesn't have a standard mapping
-  if (pad.id.includes('DualSense')) {
-    tilt2 = ignoreDeadzone(-1 * pad.axes[5]);
-
-    // DualSense triggers are cursed; they have a value of 0.0 until you first
-    // press them. Relying on the assumption that 0.0 is basically impossible
-    // to get otherwise.
-    const axis3 = pad.axes[3] || -1;
-    const axis4 = pad.axes[4] || -1;
-    zoom1 = ignoreDeadzone((axis3 + 1) / 2 - pad.buttons[4].value);
-    zoom2 = ignoreDeadzone((axis4 + 1) / 2 - pad.buttons[5].value);
-  }
-
-  const pan = pan1 || pan2;
-  const tilt = tilt1 || tilt2;
-  const roll = 0;
-  const zoom = zoom1 || zoom2;
+function readMapping(pads, mapping) {
+  const pan = -1 * readInputs(pads, mapping.panL) + readInputs(pads, mapping.panR);
+  const tilt = -1 * readInputs(pads, mapping.tiltD) + readInputs(pads, mapping.tiltU);
+  const roll = -1 * readInputs(pads, mapping.rollL) + readInputs(pads, mapping.rollR);
+  const zoom = -1 * readInputs(pads, mapping.zoomO) + readInputs(pads, mapping.zoomI);
 
   return {
     pan,
