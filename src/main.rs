@@ -183,6 +183,9 @@ async fn connect_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<d
 }
 
 async fn disconnect_devices(devices: &mut Vec<Box<dyn Device>>) {
+    if devices.is_empty() {
+        return;
+    }
     match future::try_join_all(
         devices
             .iter_mut()
