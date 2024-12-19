@@ -9,6 +9,7 @@ use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
 use device::Device;
 use futures::{future, SinkExt as _, StreamExt};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -63,9 +64,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command_tx, mut command_rx) = mpsc::unbounded_channel::<Operation>();
 
-    let mut devices = config
-        .devices
+    let used_device_ids: Vec<&String> = config.groups.iter().flatten().unique().sorted().collect();
+    let mut devices: Vec<Box<dyn Device>> = used_device_ids
         .iter()
+        .map(|&id| (id, config.devices.get(id).unwrap()))
         .map(|(id, device_config)| {
             let device: Box<dyn Device> = match device_config {
                 config::DeviceConfig::Dummy(dummy_config) => {
@@ -87,7 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             };
             return device;
         })
-        .collect::<Vec<Box<dyn Device>>>();
+        .collect();
 
     match connect_devices(&mut devices).await {
         Err(e) => {
