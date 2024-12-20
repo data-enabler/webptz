@@ -23,6 +23,7 @@ use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use uuid::Uuid;
 
 mod config;
 mod device;
@@ -36,6 +37,7 @@ enum Operation {
 
 #[derive(Serialize, Debug)]
 struct State {
+    instance: String,
     groups: Vec<Vec<String>>,
     devices: HashMap<String, DeviceStatus>,
 }
@@ -101,6 +103,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let (state_tx, state_rx) = watch::channel::<State>(State {
+        instance: Uuid::new_v4().to_string(),
         groups: config.groups.clone(),
         devices: get_device_status(&devices),
     });

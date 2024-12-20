@@ -35,6 +35,7 @@ import { GamepadData, Mapping, normalizeGamepad, readInputs } from './mapping.js
 
 /**
  * @typedef {{
+ *   instance: string,
  *   groups: string[][],
  *   devices: Record<string, {
  *     id: string,
@@ -176,6 +177,7 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
  */
 function useServer() {
   const [state, setState] = useState(/** @type {DeviceGroupState} */ ({
+    instance: '',
     groups: [],
     devices: {},
   }));
@@ -187,8 +189,16 @@ function useServer() {
       reconnectionDelayGrowFactor: 2,
       maxEnqueuedMessages: 0,
     });
+    let instanceId;
     websocket.addEventListener('message', (event) => {
+      /** @type {DeviceGroupState} */
       const data = JSON.parse(event.data);
+      if (instanceId == null) {
+        instanceId = data.instance;
+      } else if (instanceId !== data.instance) {
+        console.log('New server instance detected, reloading page');
+        window.location.reload();
+      }
       setState(data);
     });
     ws.current = websocket;
