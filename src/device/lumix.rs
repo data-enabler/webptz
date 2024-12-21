@@ -1,15 +1,18 @@
 use std::{error::Error, fmt::Display, time::Duration};
 
 use async_trait::async_trait;
+use futures::TryFutureExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{self, AsyncReadExt as _, AsyncWriteExt as _},
-    net::TcpStream,
+    net::{tcp::OwnedWriteHalf, TcpStream},
+    time::timeout,
 };
 
 const APP_UUID: &str = "52D5842E-90C6-4846-9665-C238229D22E9";
 const APP_NAME: &str = "LUMIXTether";
+const READ_TIMEOUT_MS: u64 = 200;
 
 trait WriteExt {
     async fn write_data(&mut self, data: &[u8]) -> Result<(), Box<dyn Error>>;
@@ -24,9 +27,14 @@ impl WriteExt for TcpStream {
     }
 
     async fn write_and_read_resp(&mut self, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-        self.write_data(data).await?;
         let mut buffer: [u8; 1024] = [0; 1024];
-        let len = self.read(&mut buffer).await?;
+        self.write_data(data).await?;
+        let len = timeout(
+            Duration::from_millis(READ_TIMEOUT_MS),
+            self.read(&mut buffer),
+        )
+        .map_err(|_| -> Box<dyn Error> { "timed out waiting for response".into() })
+        .await??;
         let rec_buf = &buffer[..len];
         Ok(rec_buf.to_vec())
     }
@@ -218,7 +226,8 @@ pub struct Lumix {
 
 struct Connection {
     socket: TcpStream,
-    event_socket: TcpStream,
+    event_socket: OwnedWriteHalf,
+    event_task: tokio::task::JoinHandle<()>,
     curr_transaction_id: u32,
     curr_dir: u16,
     curr_speed: u16,
@@ -231,23 +240,32 @@ impl Connection {
         cmd: CommandPacket,
         data: DataPacket,
     ) -> Result<(), Box<dyn Error>> {
-        println!("{}: Sending {}", name, cmd);
+        println!("{}: Sending ({}) {}", name, cmd.transaction_id, cmd);
+        self.curr_transaction_id += 1;
         self.socket
             .write_data(&bincode::serialize(&cmd).unwrap())
+            .map_err(|e| -> Box<dyn Error> {
+                format!("{}: error sending command: {}", name, e).into()
+            })
             .await?;
         let serialized_data = match data {
             DataPacket::ZoomStart(data) => {
-                println!("{}: Sending {}", name, data);
+                println!("{}: Sending ({}) {}", name, data.transaction_id, data);
                 bincode::serialize(&data).unwrap()
             }
             DataPacket::ZoomStop(data) => {
-                println!("{}: Sending {}", name, data);
+                println!("{}: Sending ({}) {}", name, data.transaction_id, data);
                 bincode::serialize(&data).unwrap()
             }
         };
-        let resp = self.socket.write_and_read_resp(&serialized_data).await?;
+        let resp = self
+            .socket
+            .write_and_read_resp(&serialized_data)
+            .map_err(|e| -> Box<dyn Error> {
+                format!("{}: error sending command: {}", name, e).into()
+            })
+            .await?;
         println!("{}: Received {}", name, hex::encode(resp));
-        self.curr_transaction_id += 1;
         Ok(())
     }
 
@@ -360,6 +378,28 @@ impl super::Device for Lumix {
         let init_event = hex::decode("0c000000_03000000_01000000".replace("_", "")).unwrap();
         event_socket.write_and_read_resp(&init_event).await?;
 
+        let (mut r, w) = event_socket.into_split();
+
+        let event_task_name = name.clone();
+        let event_task = tokio::spawn(async move {
+            let mut buffer: [u8; 1024] = [0; 1024];
+            loop {
+                let _len = match r.read(&mut buffer).await {
+                    Ok(len) => len,
+                    Err(e) => {
+                        println!("{}: Error reading event: {}", event_task_name, e);
+                        continue;
+                    }
+                };
+                // let rec_buf = &buffer[..len];
+                // println!(
+                //     "{}: Received event {}",
+                //     event_task_name,
+                //     hex::encode(rec_buf)
+                // );
+            }
+        });
+
         let open_session_cmd = CommandPacket::open_session(0);
         socket
             .write_and_read_resp(&bincode::serialize(&open_session_cmd).unwrap())
@@ -368,7 +408,8 @@ impl super::Device for Lumix {
         self.name = name;
         self.connection = Some(Connection {
             socket,
-            event_socket,
+            event_socket: w,
+            event_task,
             curr_transaction_id: 1,
             curr_dir: 0,
             curr_speed: 0,
@@ -385,8 +426,9 @@ impl super::Device for Lumix {
             }
             Some(ref mut c) => {
                 println!("{}: Disconnecting", name);
-                c.socket.shutdown().await?;
+                c.event_task.abort();
                 c.event_socket.shutdown().await?;
+                c.socket.shutdown().await?;
                 self.connection = None;
                 println!("{}: Disconnected", name);
             }
@@ -446,7 +488,7 @@ fn encode_str(s: &str) -> Vec<u8> {
     let mut as_utf16: Vec<u16> = s.encode_utf16().collect();
     as_utf16.push(0x0000);
     let as_bytes: Vec<u8> = as_utf16.iter().flat_map(|x| x.to_le_bytes()).collect();
-    return as_bytes;
+    as_bytes
 }
 
 #[test]
