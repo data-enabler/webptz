@@ -9,6 +9,7 @@ use btleplug::{
     platform::{Adapter, Peripheral},
 };
 
+#[allow(unused)]
 pub const SERVICE_UUID: uuid::Uuid = uuid_from_u16(0xfff0);
 pub const CHARACTERISTIC_UUID: uuid::Uuid = uuid_from_u16(0xfff5);
 const CUSTOM_ALG: crc::Algorithm<u16> = crc::Algorithm {
@@ -164,13 +165,9 @@ impl super::Device for Ronin {
 }
 
 async fn find_peripheral(adapter: &Adapter, name: &str) -> Result<Peripheral, Box<dyn Error>> {
-    adapter
-        .start_scan(ScanFilter {
-            services: [SERVICE_UUID].to_vec(),
-        })
-        .await?;
+    adapter.start_scan(ScanFilter::default()).await?;
 
-    for _ in 0..4 {
+    for _ in 0..10 {
         tokio::time::sleep(Duration::from_millis(500)).await;
         let peripherals = adapter.peripherals().await?;
         for p in peripherals {
