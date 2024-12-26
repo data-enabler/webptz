@@ -134,6 +134,7 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
   // immediately when they are non-zero
   const lastSends = useRef(/** @type {SendState[]} */([]));
   const lastStates = useRef(/** @type {ControlState[]} */([]));
+  const mouseControlRef = useMouseControl();
   const poll = useCallback(() => {
     requestRef.current = requestAnimationFrame(poll);
     if (document.timeline.currentTime == null) {
@@ -145,6 +146,10 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
     }
     lastPoll.current = currentTime;
     const controlStates = readGamepads(mappings);
+    if (mouseControlRef.current.index != null) {
+      controlStates[mouseControlRef.current.index] =
+        mouseStateToControlState(mouseControlRef.current);
+    }
 
     // Limit unnecessary re-renders by only updating state when the values change
     if (!allStatesEqual(lastStates.current, controlStates)) {
@@ -183,6 +188,127 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
     requestRef.current = requestAnimationFrame(poll);
     return () => cancelAnimationFrame(requestRef.current);
   }, [poll, mappings]);
+}
+
+/**
+ * @typedef {{
+ *   index: number|null,
+ *   type: 'pan-tilt'|'zoom',
+ *   origin: number[],
+ *   currXY: number[],
+ *   range: number,
+ * }}
+ */
+let MouseControl;
+
+/**
+ * @returns {{
+ *   current: MouseControl,
+ * }}
+ */
+function useMouseControl() {
+  /** @type {MouseControl} */
+  const initialVal = {
+    index: null,
+    type: 'pan-tilt',
+    origin: [0, 0],
+    currXY: [0, 0],
+    range: 0,
+  };
+  const ref = useRef(initialVal);
+  useEffect(() => {
+    /**
+     * @param {MouseEvent} e
+     */
+    const startDrag = function(e) {
+      if (e.target == null) {
+        return;
+      }
+      const target = /** @type {HTMLElement} */(e.target);
+      if (!target.matches('.js-pt-joystick, .js-zoom-joystick')) {
+        return;
+      }
+      e.preventDefault();
+      const allGroups = Array.from(document.querySelectorAll('.js-control'));
+      const targetControl = target.closest('.js-control');
+      if (targetControl == null) {
+        return;
+      }
+      const index = allGroups.indexOf(targetControl);
+      if (index === -1) {
+        return;
+      }
+      /** @type {MouseControl} */
+      const control = {
+        index,
+        type: target.matches('.js-zoom-joystick') ? 'zoom' : 'pan-tilt',
+        origin: [e.clientX, e.clientY],
+        currXY: [e.clientX, e.clientY],
+        range: (target.parentElement?.clientHeight || 0) / 2,
+      };
+      Object.assign(ref.current, control);
+    };
+    /**
+     * @param {MouseEvent} e
+     */
+    const move = function(e) {
+      if (ref.current.index != null) {
+        e.preventDefault();
+        ref.current.currXY = [e.clientX, e.clientY];
+      }
+    };
+    const endDrag = function() {
+      ref.current.index = null;
+    };
+    document.documentElement.addEventListener('mousedown', startDrag);
+    document.documentElement.addEventListener('mousemove', move);
+    document.documentElement.addEventListener('mouseup', endDrag);
+    document.documentElement.addEventListener('mouseleave', endDrag);
+    return function cleanup() {
+      document.documentElement.removeEventListener('mousedown', startDrag);
+      document.documentElement.removeEventListener('mousemove', move);
+      document.documentElement.removeEventListener('mouseup', endDrag);
+      document.documentElement.removeEventListener('mouseleave', endDrag);
+    };
+  }, []);
+  return ref;
+}
+
+/**
+ * @param {MouseControl} c
+ * @return {ControlState}
+ */
+function mouseStateToControlState(c) {
+  if (c.range === 0) {
+    return {
+      pan: 0,
+      tilt: 0,
+      roll: 0,
+      zoom: 0,
+    }
+  }
+  let pan = 0;
+  let tilt = 0;
+  let zoom = 0;
+  if (c.type === 'pan-tilt') {
+    const deltaX = c.currXY[0] - c.origin[0];
+    const deltaY = -1 * (c.currXY[1] - c.origin[1]);
+    const angle = Math.atan2(deltaY, deltaX);
+    const unclamped = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / c.range;
+    const magnitude = Math.min(Math.max(unclamped, -1), 1);
+    pan = magnitude * Math.cos(angle);
+    tilt = magnitude * Math.sin(angle);
+  }
+  if (c.type === 'zoom') {
+    const unclamped = -1 * (c.currXY[1] - c.origin[1]) / c.range;
+    zoom = Math.min(Math.max(unclamped, -1), 1);
+  }
+  return {
+    pan,
+    tilt,
+    roll: 0,
+    zoom,
+  };
 }
 
 /**
@@ -258,7 +384,7 @@ function App() {
   return state.groups.map((group, i) => {
     const s = controlStates[i] || ZERO_STATE;
     return html`
-      <div class="control"
+      <div class="control js-control"
         style=${{
           '--pan': s.pan,
           '--tilt': s.tilt,
@@ -283,10 +409,10 @@ function App() {
         <div class="control__controls">
           <div class="control__pt">
             <div class="control__pt-bg"></div>
-            <div class="control__pt-joystick"></div>
+            <div class="control__pt-joystick js-pt-joystick"></div>
           </div>
           <div class="control__zoom">
-            <div class="control__zoom-joystick"></div>
+            <div class="control__zoom-joystick js-zoom-joystick"></div>
           </div>
         </div>
       </div>

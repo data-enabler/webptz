@@ -90,6 +90,7 @@ button[disabled] {
 
   border-radius: 50%;
   background: black;
+  cursor: grab;
   transition: transform linear 0.0333s;
 }
 
