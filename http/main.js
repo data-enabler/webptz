@@ -75,31 +75,47 @@ const MAPPINGS = [
   {
     panL: [
       { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'negative' },
-      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'negative' },
     ],
     panR: [
       { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'positive' },
-      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'positive' },
     ],
     tiltU: [
       { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'negative' },
-      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'negative' },
     ],
     tiltD: [
       { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'positive' },
-      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'positive' },
     ],
     rollL: [],
     rollR: [],
     zoomI: [
       { padIndex: 0, type: 'button', inputIndex: 6, sign: 'positive' },
-      { padIndex: 0, type: 'button', inputIndex: 7, sign: 'positive' },
     ],
     zoomO: [
       { padIndex: 0, type: 'button', inputIndex: 4, sign: 'positive' },
+    ],
+  },
+  {
+    panL: [
+      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'negative' },
+    ],
+    panR: [
+      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'positive' },
+    ],
+    tiltU: [
+      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'negative' },
+    ],
+    tiltD: [
+      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'positive' },
+    ],
+    rollL: [],
+    rollR: [],
+    zoomI: [
+      { padIndex: 0, type: 'button', inputIndex: 7, sign: 'positive' },
+    ],
+    zoomO: [
       { padIndex: 0, type: 'button', inputIndex: 5, sign: 'positive' },
     ],
-  }
+  },
 ];
 
 /**
