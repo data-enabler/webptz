@@ -218,7 +218,7 @@ function useMouseControl() {
   const ref = useRef(initialVal);
   useEffect(() => {
     /**
-     * @param {MouseEvent} e
+     * @param {MouseEvent|TouchEvent} e
      */
     const startDrag = function(e) {
       if (e.target == null) {
@@ -238,37 +238,50 @@ function useMouseControl() {
       if (index === -1) {
         return;
       }
+      const origin = e instanceof MouseEvent
+        ? [e.clientX, e.clientY]
+        : [e.touches[0].clientX, e.touches[0].clientY];
       /** @type {MouseControl} */
       const control = {
         index,
         type: target.matches('.js-zoom-joystick') ? 'zoom' : 'pan-tilt',
-        origin: [e.clientX, e.clientY],
-        currXY: [e.clientX, e.clientY],
+        origin,
+        currXY: origin,
         range: (target.parentElement?.clientHeight || 0) / 2,
       };
       Object.assign(ref.current, control);
     };
     /**
-     * @param {MouseEvent} e
+     * @param {MouseEvent|TouchEvent} e
      */
     const move = function(e) {
       if (ref.current.index != null) {
         e.preventDefault();
-        ref.current.currXY = [e.clientX, e.clientY];
+        ref.current.currXY = e instanceof MouseEvent
+          ? [e.clientX, e.clientY]
+          : [e.touches[0].clientX, e.touches[0].clientY];
       }
     };
     const endDrag = function() {
       ref.current.index = null;
     };
     document.documentElement.addEventListener('mousedown', startDrag);
+    document.documentElement.addEventListener('touchstart', startDrag, { passive: false });
     document.documentElement.addEventListener('mousemove', move);
+    document.documentElement.addEventListener('touchmove', move, { passive: false });
     document.documentElement.addEventListener('mouseup', endDrag);
+    document.documentElement.addEventListener('touchend', endDrag);
     document.documentElement.addEventListener('mouseleave', endDrag);
+    document.documentElement.addEventListener('touchcancel', endDrag);
     return function cleanup() {
       document.documentElement.removeEventListener('mousedown', startDrag);
+      document.documentElement.removeEventListener('touchstart', startDrag);
       document.documentElement.removeEventListener('mousemove', move);
+      document.documentElement.removeEventListener('touchmove', move);
       document.documentElement.removeEventListener('mouseup', endDrag);
+      document.documentElement.removeEventListener('touchend', endDrag);
       document.documentElement.removeEventListener('mouseleave', endDrag);
+      document.documentElement.removeEventListener('touchcancel', endDrag);
     };
   }, []);
   return ref;

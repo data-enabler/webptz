@@ -1,6 +1,7 @@
 :root {
   --size: 200px;
-  --thumb-size: 20px;
+  --thumb-size: 24px;
+  --tap-size: 44px;
   --pan: 0;
   --tilt: 0;
   --roll: 0;
@@ -92,6 +93,29 @@ button[disabled] {
   background: black;
   cursor: grab;
   transition: transform linear 0.0333s;
+}
+
+.control__pt-joystick::before, .control__zoom-joystick::before {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  box-sizing: border-box;
+
+  transform: translate(-50%, -50%);
+}
+
+.control__pt-joystick::before {
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+}
+
+.control__zoom-joystick::before {
+  width: var(--tap-size);
+  height: var(--size);
+  border-radius: calc(var(--tap-size) / 2);
 }
 
 .control__pt-joystick {
