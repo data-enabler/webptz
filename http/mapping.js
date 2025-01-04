@@ -8,7 +8,7 @@ export let GamepadData;
  *   padIndex: number,
  *   type: "axis"|"button",
  *   inputIndex: number,
- *   sign: "positive"|"negative",
+ *   multiplier: number,
  * }}
  */
 export let PadInput;
@@ -27,6 +27,11 @@ export let PadInput;
  * }}
  */
 export let Mapping;
+
+/**
+ * @typedef {Record<string, Mapping>}
+ */
+export let Mappings;
 
 const DEADZONE = 0.1;
 
@@ -133,12 +138,11 @@ export function readInput(pads, input) {
   if (pad == null) {
     return 0;
   }
-  const multiplier = input.sign === 'negative' ? -1 : 1;
   switch (input.type) {
     case 'button':
-      return ignoreDeadzone(Math.max(0, pad.buttons[input.inputIndex].value * multiplier));
+      return ignoreDeadzone(Math.max(0, pad.buttons[input.inputIndex].value * input.multiplier));
     case 'axis':
-      return ignoreDeadzone(Math.max(0, pad.axes[input.inputIndex] * multiplier));
+      return ignoreDeadzone(Math.max(0, pad.axes[input.inputIndex] * input.multiplier));
   }
 }
 

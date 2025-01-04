@@ -3,7 +3,7 @@ import { html, render, useState, useEffect, useRef, useCallback } from 'https://
 // @ts-ignore
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
-import { GamepadData, Mapping, normalizeGamepad, readInputs } from './mapping.js';
+import { GamepadData, Mapping, Mappings, normalizeGamepad, readInputs } from './mapping.js';
 
 /**
  * @typedef {{
@@ -36,13 +36,21 @@ import { GamepadData, Mapping, normalizeGamepad, readInputs } from './mapping.js
 /**
  * @typedef {{
  *   instance: string,
- *   groups: string[][],
+ *   groups: Group[],
  *   devices: Record<string, {
  *     id: string,
  *     name: string,
  *     connected: boolean,
  *   }>,
- * }} DeviceGroupState
+ *   defaultControls?: Mapping[],
+ * }} ServerState
+ */
+
+/**
+ * @typedef {{
+ *   name: string;
+ *   devices: string[];
+ * }} Group
  */
 
 /**
@@ -55,10 +63,18 @@ import { GamepadData, Mapping, normalizeGamepad, readInputs } from './mapping.js
  */
 
 /**
+ * @typedef {Record<string, ControlState>} ControlStates
+ */
+
+/**
  * @typedef {{
  *   lastTimestamp: number,
  *   lastState: ControlState,
  * }} SendState
+ */
+
+/**
+ * @typedef {Record<string, SendState>} SendStates
  */
 
 const EPSILON = 0.5 * 1/240; // Ideally this would be based on the display refresh rate
@@ -70,70 +86,23 @@ const ZERO_STATE = Object.freeze({
   roll: 0,
   zoom: 0,
 });
-/** @type {Mapping[]} */
-const MAPPINGS = [
-  {
-    panL: [
-      { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'negative' },
-    ],
-    panR: [
-      { padIndex: 0, type: 'axis', inputIndex: 0, sign: 'positive' },
-    ],
-    tiltU: [
-      { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'negative' },
-    ],
-    tiltD: [
-      { padIndex: 0, type: 'axis', inputIndex: 1, sign: 'positive' },
-    ],
-    rollL: [],
-    rollR: [],
-    zoomI: [
-      { padIndex: 0, type: 'button', inputIndex: 6, sign: 'positive' },
-    ],
-    zoomO: [
-      { padIndex: 0, type: 'button', inputIndex: 4, sign: 'positive' },
-    ],
-  },
-  {
-    panL: [
-      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'negative' },
-    ],
-    panR: [
-      { padIndex: 0, type: 'axis', inputIndex: 2, sign: 'positive' },
-    ],
-    tiltU: [
-      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'negative' },
-    ],
-    tiltD: [
-      { padIndex: 0, type: 'axis', inputIndex: 3, sign: 'positive' },
-    ],
-    rollL: [],
-    rollR: [],
-    zoomI: [
-      { padIndex: 0, type: 'button', inputIndex: 7, sign: 'positive' },
-    ],
-    zoomO: [
-      { padIndex: 0, type: 'button', inputIndex: 5, sign: 'positive' },
-    ],
-  },
-];
 
 /**
  * @param {{
- *   groupIds: string[][],
- *   controlStates: ControlState[],
- *   setControlStates: function(ControlState[]): void,
+ *   groups: Group[],
+ *   controlStates: ControlStates,
+ *   setControlStates: function(ControlStates): void,
  *   send: function(CommandMessage): void,
- *   mappings: Mapping[],
+ *   mappings: Mappings,
  * }} props
  */
-function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
+function useGamepadPoll({ groups, setControlStates, send, mappings }) {
   const requestRef = useRef();
   const lastPoll = useRef(document.timeline.currentTime || 0);
   // Track the send times independently for each device group, so that we can send commands
   // immediately when they are non-zero
-  const lastSends = useRef(/** @type {SendState[]} */([]));
-  const lastStates = useRef(/** @type {ControlState[]} */([]));
+  const lastSends = useRef(/** @type {SendStates} */({}));
+  const lastStates = useRef(/** @type {ControlStates} */({}));
   const mouseControlRef = useMouseControl();
   const poll = useCallback(() => {
     requestRef.current = requestAnimationFrame(poll);
@@ -146,8 +115,8 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
     }
     lastPoll.current = currentTime;
     const controlStates = readGamepads(mappings);
-    if (mouseControlRef.current.index != null) {
-      controlStates[mouseControlRef.current.index] =
+    if (mouseControlRef.current.groupId != null) {
+      controlStates[mouseControlRef.current.groupId] =
         mouseStateToControlState(mouseControlRef.current);
     }
 
@@ -157,11 +126,11 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
     }
     lastStates.current = controlStates;
 
-    groupIds.forEach((group, i) => {
+    groups.forEach(({name: groupId, devices}) => {
       /** @type {ControlState} */
-      const currState = controlStates[i] || ZERO_STATE;
+      const currState = controlStates[groupId] || ZERO_STATE;
       /** @type {Partial<SendState>} */
-      const sendState = lastSends.current[i] || {};
+      const sendState = lastSends.current[groupId] || {};
       const {
         lastTimestamp = 0,
         lastState = {pan: 0, tilt: 0, roll: 0, zoom: 0},
@@ -174,25 +143,25 @@ function useGamepadPoll({ groupIds, setControlStates, send, mappings }) {
       }
       send({
         command: {
-          devices: group,
+          devices,
           ...currState,
         }
       });
-      lastSends.current[i] = {
+      lastSends.current[groupId] = {
         lastTimestamp: currentTime,
         lastState: currState,
       };
     });
-  }, [groupIds, setControlStates]);
+  }, [groups, setControlStates, mappings]);
   useEffect(() => {
     requestRef.current = requestAnimationFrame(poll);
     return () => cancelAnimationFrame(requestRef.current);
-  }, [poll, mappings]);
+  }, [poll]);
 }
 
 /**
  * @typedef {{
- *   index: number|null,
+ *   groupId: string|null,
  *   type: 'pan-tilt'|'zoom',
  *   origin: number[],
  *   currXY: number[],
@@ -209,12 +178,13 @@ let MouseControl;
 function useMouseControl() {
   /** @type {MouseControl} */
   const initialVal = {
-    index: null,
+    groupId: null,
     type: 'pan-tilt',
     origin: [0, 0],
     currXY: [0, 0],
     range: 0,
   };
+  /** @type {{current: MouseControl}} */
   const ref = useRef(initialVal);
   useEffect(() => {
     /**
@@ -229,13 +199,9 @@ function useMouseControl() {
         return;
       }
       e.preventDefault();
-      const allGroups = Array.from(document.querySelectorAll('.js-control'));
-      const targetControl = target.closest('.js-control');
-      if (targetControl == null) {
-        return;
-      }
-      const index = allGroups.indexOf(targetControl);
-      if (index === -1) {
+      const targetControl = /** @type {HTMLElement|null} */(target.closest('.js-control'));
+      const groupId = targetControl?.dataset.groupId;
+      if (!groupId) {
         return;
       }
       const origin = e instanceof MouseEvent
@@ -243,7 +209,7 @@ function useMouseControl() {
         : [e.touches[0].clientX, e.touches[0].clientY];
       /** @type {MouseControl} */
       const control = {
-        index,
+        groupId,
         type: target.matches('.js-zoom-joystick') ? 'zoom' : 'pan-tilt',
         origin,
         currXY: origin,
@@ -255,7 +221,7 @@ function useMouseControl() {
      * @param {MouseEvent|TouchEvent} e
      */
     const move = function(e) {
-      if (ref.current.index != null) {
+      if (ref.current.groupId != null) {
         e.preventDefault();
         ref.current.currXY = e instanceof MouseEvent
           ? [e.clientX, e.clientY]
@@ -263,7 +229,7 @@ function useMouseControl() {
       }
     };
     const endDrag = function() {
-      ref.current.index = null;
+      ref.current.groupId = null;
     };
     document.documentElement.addEventListener('mousedown', startDrag);
     document.documentElement.addEventListener('touchstart', startDrag, { passive: false });
@@ -326,12 +292,12 @@ function mouseStateToControlState(c) {
 
 /**
  * @return {{
- *   state: DeviceGroupState,
+ *   state: ServerState,
  *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage): void,
  * }}
  */
 function useServer() {
-  const [state, setState] = useState(/** @type {DeviceGroupState} */ ({
+  const [state, setState] = useState(/** @type {ServerState} */ ({
     instance: '',
     groups: [],
     devices: {},
@@ -346,7 +312,7 @@ function useServer() {
     });
     let instanceId;
     websocket.addEventListener('message', (event) => {
-      /** @type {DeviceGroupState} */
+      /** @type {ServerState} */
       const data = JSON.parse(event.data);
       if (instanceId == null) {
         instanceId = data.instance;
@@ -377,15 +343,18 @@ function useServer() {
 
 function App() {
   const { state, send } = useServer();
-  const [controlStates, setControlStates] = useState(/** @type {ControlState[]} */ (
-    state.groups.map(() => ZERO_STATE)
+  const [controlStates, setControlStates] = useState(/** @type {ControlStates} */ (
+    Object.fromEntries(state.groups.map((g) => [g.name, ZERO_STATE]))
   ));
+  const [localMappings] = useState(null);
+  const serverMappings = mapDefaultControls(state.groups, state.defaultControls);
+  const mappings = localMappings || serverMappings;
   useGamepadPoll({
-    groupIds: state.groups,
+    groups: state.groups,
     controlStates,
     setControlStates,
     send,
-    mappings: MAPPINGS,
+    mappings,
   });
   const onDisconnect = (id) => {
     send({ disconnect: { devices: [id] } });
@@ -394,10 +363,11 @@ function App() {
     send({ reconnect: { devices: [id] } });
   };
 
-  return state.groups.map((group, i) => {
-    const s = controlStates[i] || ZERO_STATE;
+  return state.groups.map(({ name: groupId, devices }) => {
+    const s = controlStates[groupId] || ZERO_STATE;
     return html`
       <div class="control js-control"
+        data-group-id=${groupId}
         style=${{
           '--pan': s.pan,
           '--tilt': s.tilt,
@@ -405,8 +375,9 @@ function App() {
           '--zoom': s.zoom,
         }}
       >
+        <h2 class="control__name">${groupId}</h2>
         <div>
-          ${group.map((id) => {
+          ${devices.map((id) => {
             const d = state.devices[id];
             return html`
               <div class="control__device">
@@ -445,17 +416,16 @@ window.addEventListener("gamepadconnected", (e) => {
   );
 });
 
-function nonNull(x) {
-  return x != null;
-}
-
 /**
- * @param {Mapping[]} mappings
- * @returns {ControlState[]}
+ * @param {Mappings} mappings
+ * @returns {ControlStates}
  */
 function readGamepads(mappings) {
   const pads = navigator.getGamepads().map(normalizeGamepad);
-  return mappings.map(m => readMapping(pads, m));
+  return Object.fromEntries(
+    Object.entries(mappings)
+      .map(([groupId, m]) => [groupId, readMapping(pads, m)])
+  );
 }
 
 /**
@@ -478,20 +448,40 @@ function readMapping(pads, mapping) {
 }
 
 /**
- * @param {ControlState[]} states1
- * @param {ControlState[]} states2
- * @returns {boolean}
+ * @param {Group[]} groups
+ * @param {Mapping[]|undefined} defaultControls
+ * @returns {Mappings}
  */
-function allStatesEqual(states1, states2) {
-  return states1.length === states2.length && states1.every((state1, i) => statesEqual(state1, states2[i]));
+function mapDefaultControls(groups, defaultControls) {
+  if (defaultControls == null) {
+    return {};
+  }
+  return Object.fromEntries(
+    groups.map((group, i) => [group.name, defaultControls[i]])
+  );
 }
 
 /**
- * @param {ControlState} state1
- * @param {ControlState} state2
+ * @param {ControlStates} states1
+ * @param {ControlStates} states2
+ * @returns {boolean}
+ */
+function allStatesEqual(states1, states2) {
+  return Object.keys(states1).length === Object.keys(states2).length &&
+    Object.entries(states1).every(
+      ([groupId, state1]) => statesEqual(state1, states2[groupId])
+    );
+}
+
+/**
+ * @param {ControlState|undefined} state1
+ * @param {ControlState|undefined} state2
  * @returns {boolean}
  */
 function statesEqual(state1, state2) {
+  if (state1 == null || state2 == null) {
+    return state1 == state2;
+  }
   return state1.pan === state2.pan && state1.tilt === state2.tilt && state1.roll === state2.roll && state1.zoom === state2.zoom;
 }
 

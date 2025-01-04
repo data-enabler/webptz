@@ -18,7 +18,21 @@ body {
 
 .control {
   flex: 0 0 auto;
+  width: min-content;
+
   border: 1px solid currentColor;
+  word-break: break-all;
+}
+
+.control__name {
+  margin: 0;
+
+  padding: 0.2em;
+
+  text-align: center;
+  border-bottom: 1px solid currentColor;
+  font-size: 1.25em;
+  font-weight: bold;
 }
 
 .control__device {

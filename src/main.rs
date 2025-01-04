@@ -7,6 +7,7 @@ use axum::Router;
 use axum_extra::{headers, TypedHeader};
 use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
+use config::{Group, Mappings};
 use device::Device;
 use futures::{future, SinkExt as _, StreamExt, TryFutureExt};
 use itertools::Itertools;
@@ -36,13 +37,16 @@ enum Operation {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct State {
     instance: String,
-    groups: Vec<Vec<String>>,
+    groups: Vec<Group>,
     devices: HashMap<String, DeviceStatus>,
+    default_controls: Option<Vec<Mappings>>,
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct DeviceStatus {
     id: String,
     name: String,
@@ -66,7 +70,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command_tx, mut command_rx) = mpsc::unbounded_channel::<Operation>();
 
-    let used_device_ids: Vec<&String> = config.groups.iter().flatten().unique().sorted().collect();
+    let used_device_ids: Vec<&String> = config
+        .groups
+        .iter()
+        .flat_map(|g| g.devices.iter())
+        .unique()
+        .sorted()
+        .collect();
     let mut devices: Vec<Box<dyn Device>> = used_device_ids
         .iter()
         .map(|&id| (id, config.devices.get(id).unwrap()))
@@ -103,6 +113,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         instance: Uuid::new_v4().to_string(),
         groups: config.groups.clone(),
         devices: get_device_status(&devices),
+        default_controls: config.default_controls,
     });
 
     tokio::spawn(web_server(command_tx, state_rx));
@@ -362,16 +373,15 @@ fn process_message(
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 enum Request {
-    #[serde(rename = "command")]
     Command(CommandRequest),
-    #[serde(rename = "disconnect")]
     Disconnect(DisconnectRequest),
-    #[serde(rename = "reconnect")]
     Reconnect(ReconnectRequest),
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct CommandRequest {
     devices: Vec<String>,
     #[serde(flatten)]
@@ -379,11 +389,13 @@ struct CommandRequest {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct DisconnectRequest {
     devices: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct ReconnectRequest {
     devices: Vec<String>,
 }
