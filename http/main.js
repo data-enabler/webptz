@@ -1,4 +1,3 @@
-// @ts-ignore
 import { html, render, useState } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
 import { ZERO_STATE, mapDefaultControls, useGamepadPoll } from './controls.js';
@@ -70,9 +69,9 @@ function App() {
 
 render(html`<${App} />`, document.body);
 
-window.addEventListener("gamepadconnected", (e) => {
+window.addEventListener('gamepadconnected', (e) => {
   console.log(
-    "Gamepad connected at index %d: %s. %d buttons, %d axes.",
+    'Gamepad connected at index %d: %s. %d buttons, %d axes.',
     e.gamepad.index,
     e.gamepad.id,
     e.gamepad.buttons.length,

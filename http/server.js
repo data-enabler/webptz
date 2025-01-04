@@ -1,6 +1,4 @@
-// @ts-ignore
 import { useState, useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
-// @ts-ignore
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
 import { Mapping } from './mapping.js';
@@ -71,7 +69,7 @@ export function useServer() {
     groups: [],
     devices: {},
   }));
-  const ws = useRef(null);
+  const ws = useRef(/** @type {WebSocket|null} */(null));
   useEffect(() => {
     const websocket = new ReconnectingWebSocket("/control", [], {
       minReconnectionDelay: 500,

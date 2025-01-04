@@ -1,4 +1,3 @@
-// @ts-ignore
 import { useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
 import { ControlState } from './state.js';

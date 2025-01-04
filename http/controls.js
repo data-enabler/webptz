@@ -1,4 +1,3 @@
-// @ts-ignore
 import { useEffect, useRef, useCallback } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
 import { GamepadData, Mapping, Mappings, normalizeGamepad, readInputs } from './mapping.js';
@@ -39,8 +38,8 @@ export const ZERO_STATE = Object.freeze({
  * }} props
  */
 export function useGamepadPoll({ groups, setControlStates, send, mappings }) {
-  const requestRef = useRef();
-  const lastPoll = useRef(document.timeline.currentTime || 0);
+  const requestRef = useRef(0);
+  const lastPoll = useRef(/** @type {number} */ (document.timeline.currentTime || 0));
   // Track the send times independently for each device group, so that we can send commands
   // immediately when they are non-zero
   const lastSends = useRef(/** @type {SendStates} */({}));
