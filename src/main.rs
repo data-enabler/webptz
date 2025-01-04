@@ -8,7 +8,7 @@ use axum_extra::{headers, TypedHeader};
 use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
 use device::Device;
-use futures::{future, SinkExt as _, StreamExt};
+use futures::{future, SinkExt as _, StreamExt, TryFutureExt};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let manager = Manager::new().await?;
 
     let adapters = manager.adapters().await?;
-    let central = match adapters.into_iter().nth(0) {
+    let central = match adapters.first() {
         None => return Err("no bluetooth adapter found".into()),
         Some(x) => x,
     };
@@ -89,17 +89,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Box::new(lumix)
                 }
             };
-            return device;
+            device
         })
         .collect();
 
-    match connect_devices(&mut devices).await {
-        Err(e) => {
-            println!("{}", e);
-            disconnect_devices(&mut devices).await;
-            return Err(e);
-        }
-        _ => (),
+    if let Err(e) = connect_devices(&mut devices).await {
+        println!("{}", e);
+        disconnect_devices(&mut devices).await;
+        return Err(e);
     }
 
     let (state_tx, state_rx) = watch::channel::<State>(State {
@@ -114,30 +111,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match operation {
             Operation::Command(request) => {
                 println!(
-                    "Sending command {:?} to cameras {:?}",
+                    "== Received command {:?} for cameras {:?} ==",
                     request.command, request.devices
                 );
-                for device in devices.iter_mut() {
-                    let id = device.id();
-                    if !request.devices.iter().any(|x| x == &id) {
-                        continue;
-                    }
-                    match device.send_command(request.command).await {
-                        Err(e) => println!("Error sending command: {}", e),
-                        _ => (),
-                    }
-                }
+                let futures = devices
+                    .iter_mut()
+                    .filter(|d| request.devices.iter().any(|x| x == &d.id()))
+                    .map(|d| {
+                        d.send_command(request.command)
+                            .map_err(|e| println!("Error sending command: {}", e))
+                    });
+                future::join_all(futures).await;
+                println!("== Command processed ==");
             }
             Operation::Disconnect(request) => {
                 println!("Disconnecting cameras {:?}", request.devices);
-                for device in devices.iter_mut() {
-                    let id = device.id();
-                    if !request.devices.iter().any(|x| x == &id) {
-                        continue;
-                    }
-                    match device.disconnect().await {
-                        Err(e) => println!("Error disconnecting device: {}", e),
-                        _ => (),
+                for device in devices
+                    .iter_mut()
+                    .filter(|d| request.devices.iter().any(|x| x == &d.id()))
+                {
+                    if let Err(e) = device.disconnect().await {
+                        println!("Error disconnecting device: {}", e)
                     }
                 }
                 state_tx.send_modify(|s| {
@@ -147,14 +141,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Operation::Reconnect(request) => {
                 println!("Reconnecting cameras {:?}", request.devices);
-                for device in devices.iter_mut() {
-                    let id = device.id();
-                    if !request.devices.iter().any(|x| x == &id) {
-                        continue;
-                    }
-                    match device.reconnect().await {
-                        Err(e) => println!("Error reconnecting device: {}", e),
-                        _ => (),
+                for device in devices
+                    .iter_mut()
+                    .filter(|d| request.devices.iter().any(|x| x == &d.id()))
+                {
+                    if let Err(e) = device.reconnect().await {
+                        println!("Error reconnecting device: {}", e)
                     }
                 }
                 state_tx.send_modify(|s| {
@@ -176,7 +168,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn connect_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<dyn Error>> {
+async fn connect_devices(devices: &mut [Box<dyn Device>]) -> Result<(), Box<dyn Error>> {
     for device in devices.iter_mut() {
         device.connect().await.map_err(|e| -> Box<dyn Error> {
             format!("error connecting to {}: {}", device, e).into()
@@ -185,24 +177,18 @@ async fn connect_devices(devices: &mut Vec<Box<dyn Device>>) -> Result<(), Box<d
     Ok(())
 }
 
-async fn disconnect_devices(devices: &mut Vec<Box<dyn Device>>) {
+async fn disconnect_devices(devices: &mut [Box<dyn Device>]) {
     if devices.is_empty() {
         return;
     }
-    match future::try_join_all(
-        devices
-            .iter_mut()
-            .filter(|d| d.is_connected())
-            .map(|d| d.disconnect()),
-    )
-    .await
-    {
-        Err(e) => println!("Error disconnecting devices: {}", e),
-        _ => (),
+    for device in devices.iter_mut().filter(|d| d.is_connected()) {
+        if let Err(e) = device.disconnect().await {
+            println!("Error disconnecting device {}: {}", device, e);
+        }
     }
 }
 
-fn get_device_status(devices: &Vec<Box<dyn Device>>) -> HashMap<String, DeviceStatus> {
+fn get_device_status(devices: &[Box<dyn Device>]) -> HashMap<String, DeviceStatus> {
     devices
         .iter()
         .map(|d| {
