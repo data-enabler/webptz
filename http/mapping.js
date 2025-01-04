@@ -1,7 +1,6 @@
 /**
- * @typedef {Pick<Gamepad, "buttons"|"axes"|"id"|"mapping">}
+ * @typedef {Pick<Gamepad, "buttons"|"axes"|"id"|"mapping">} GamepadData
  */
-export let GamepadData;
 
 /**
  * @typedef {{
@@ -9,9 +8,8 @@ export let GamepadData;
  *   type: "axis"|"button",
  *   inputIndex: number,
  *   multiplier: number,
- * }}
+ * }} PadInput
  */
-export let PadInput;
 
 
 /**
@@ -24,14 +22,12 @@ export let PadInput;
  *   rollR: PadInput[],
  *   zoomI: PadInput[],
  *   zoomO: PadInput[],
- * }}
+ * }} Mapping
  */
-export let Mapping;
 
 /**
- * @typedef {Record<string, Mapping>}
+ * @typedef {Record<string, Mapping>} Mappings
  */
-export let Mappings;
 
 const DEADZONE = 0.1;
 
@@ -146,6 +142,10 @@ export function readInput(pads, input) {
   }
 }
 
+/**
+ * @param {number} val
+ * @returns {number}
+ */
 function ignoreDeadzone(val) {
   if (Math.abs(val) < DEADZONE) {
     return 0;
@@ -158,6 +158,9 @@ function ignoreDeadzone(val) {
  */
 export function waitForGamepadInput() {
   return new Promise((resolve) => {
+    /**
+     * @param {PadInput|null} val
+     */
     function resolveWithValue(val) {
       clearInterval(interval);
       window.removeEventListener('keydown', keyHandler);
@@ -175,7 +178,7 @@ export function waitForGamepadInput() {
               padIndex: pad.index,
               type: 'button',
               inputIndex: i,
-              sign: 'positive',
+              multiplier: 1.0,
             });
             return;
           }
@@ -186,7 +189,7 @@ export function waitForGamepadInput() {
               padIndex: pad.index,
               type: 'axis',
               inputIndex: i,
-              sign: pad.axes[i] > 0 ? 'positive' : 'negative',
+              multiplier: pad.axes[i] > 0 ? 1.0 : -1.0,
             });
             return;
           }
@@ -195,6 +198,9 @@ export function waitForGamepadInput() {
     }
     const interval = setInterval(findPressedInput, 100);
 
+    /**
+     * @param {KeyboardEvent} e
+     */
     function keyHandler(e) {
       if (e.key === 'Escape') {
         resolveWithValue(null);

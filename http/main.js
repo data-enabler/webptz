@@ -2,7 +2,7 @@ import { html, render, useState } from 'https://unpkg.com/htm@^3.1.1/preact/stan
 
 import { ZERO_STATE, mapDefaultControls, useGamepadPoll } from './controls.js';
 import { useServer } from './server.js';
-import { ControlStates } from './state.js';
+/** @import { ControlStates } from './state.js'; */
 
 function App() {
   const { state, send } = useServer();
@@ -19,12 +19,18 @@ function App() {
     send,
     mappings,
   });
-  const onDisconnect = (id) => {
+  /**
+   * @param {string} id
+   */
+  function onDisconnect(id) {
     send({ disconnect: { devices: [id] } });
-  };
-  const onReconnect = (id) => {
+  }
+  /**
+   * @param {string} id
+   */
+  function onReconnect(id) {
     send({ reconnect: { devices: [id] } });
-  };
+  }
 
   return state.groups.map(({ name: groupId, devices }) => {
     const s = controlStates[groupId] || ZERO_STATE;

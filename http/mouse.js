@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
-import { ControlState } from './state.js';
+/** @import { ControlState } from './state.js'; */
 
 /**
  * @typedef {{
@@ -9,9 +9,8 @@ import { ControlState } from './state.js';
  *   origin: number[],
  *   currXY: number[],
  *   range: number,
- * }}
+ * }} MouseControl
  */
-export let MouseControl;
 
 /**
  * @returns {{

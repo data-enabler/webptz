@@ -4,11 +4,11 @@
  *   tilt: number,
  *   roll: number,
  *   zoom: number,
- * }}
+ * }} ControlState
  */
-export let ControlState;
 
 /**
- * @typedef {Record<string, ControlState>}
+ * @typedef {Record<string, ControlState>} ControlStates
  */
-export let ControlStates;
+
+export {}

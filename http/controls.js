@@ -1,23 +1,22 @@
 import { useEffect, useRef, useCallback } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
-import { GamepadData, Mapping, Mappings, normalizeGamepad, readInputs } from './mapping.js';
+/** @import { GamepadData, Mapping, Mappings } from './mapping.js'; */
+import { normalizeGamepad, readInputs } from './mapping.js';
 import { useMouseControl, mouseStateToControlState } from './mouse.js';
-import { CommandMessage, Group } from './server.js';
-import { ControlState, ControlStates } from './state.js';
+/** @import { CommandMessage, Group } from 'server.js'; */
+/** @import { ControlState, ControlStates } from './state.js'; */
 
 /**
  * @typedef {{
  *   lastTimestamp: number,
  *   lastState: ControlState,
- * }}
+ * }} SendState
  */
 
-export let SendState;
 /**
- * @typedef {Record<string, SendState>}
+ * @typedef {Record<string, SendState>} SendStates
  */
 
-export let SendStates;
 const EPSILON = 0.5 * 1 / 240; // Ideally this would be based on the display refresh rate
 
 const POLL_INTERVAL = (1 / 60 - EPSILON) * 1000;

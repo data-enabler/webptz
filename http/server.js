@@ -1,28 +1,25 @@
 import { useState, useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
-import { Mapping } from './mapping.js';
+/** @import { Mapping } from './mapping.js'; */
 
 /**
  * @typedef {{
  *   command: Data,
- * }}
+ * }} CommandMessage
  */
-export let CommandMessage;
 
 /**
  * @typedef {{
  *   disconnect: { devices: string[] },
- * }}
+ * }} DisconnectMessage
  */
-export let DisconnectMessage;
 
 /**
  * @typedef {{
  *   reconnect: { devices: string[] },
- * }}
+ * }} ReconnectMessage
  */
-export let ReconnectMessage;
 
 /**
  * @typedef {{
@@ -31,9 +28,8 @@ export let ReconnectMessage;
  *   tilt: number,
  *   roll: number,
  *   zoom: number,
- * }}
+ * }} Data
  */
-export let Data;
 
 /**
  * @typedef {{
@@ -45,17 +41,15 @@ export let Data;
  *     connected: boolean,
  *   }>,
  *   defaultControls?: Mapping[],
- * }}
+ * }} ServerState
  */
-export let ServerState;
 
 /**
  * @typedef {{
  *   name: string;
  *   devices: string[];
- * }}
+ * }} Group
  */
-export let Group;
 
 /**
  * @return {{
@@ -77,7 +71,9 @@ export function useServer() {
       reconnectionDelayGrowFactor: 2,
       maxEnqueuedMessages: 0,
     });
-    let instanceId;
+
+    /** @type {string|null} */
+    let instanceId = null;
     websocket.addEventListener('message', (event) => {
       /** @type {ServerState} */
       const data = JSON.parse(event.data);
@@ -89,6 +85,7 @@ export function useServer() {
       }
       setState(data);
     });
+
     ws.current = websocket;
     return () => {
       ws.current = null;
