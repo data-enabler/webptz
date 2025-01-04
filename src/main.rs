@@ -156,11 +156,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Operation::Shutdown => {
                 println!("Shutting down...");
-                disconnect_devices(&mut devices).await;
                 state_tx.send_modify(|s| {
                     s.groups = vec![];
                     s.devices = HashMap::new();
                 });
+                disconnect_devices(&mut devices).await;
                 break;
             }
         }
