@@ -147,7 +147,7 @@ impl super::Device for Ronin {
         Ok(())
     }
 
-    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>> {
+    async fn reconnect(&mut self) -> Result<(), Box<dyn Error>> {
         self.disconnect().await?;
         self.connect().await?;
         Ok(())

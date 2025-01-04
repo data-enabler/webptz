@@ -17,19 +17,19 @@ pub struct Command {
 
 #[async_trait]
 pub trait Device: std::fmt::Display {
-    async fn send_command(self: &mut Self, command: Command) -> Result<(), Box<dyn Error>>;
+    async fn send_command(&mut self, command: Command) -> Result<(), Box<dyn Error>>;
 
-    async fn connect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+    async fn connect(&mut self) -> Result<(), Box<dyn Error>>;
 
-    async fn disconnect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+    async fn disconnect(&mut self) -> Result<(), Box<dyn Error>>;
 
-    async fn reconnect(self: &mut Self) -> Result<(), Box<dyn Error>>;
+    async fn reconnect(&mut self) -> Result<(), Box<dyn Error>>;
 
-    fn is_connected(self: &Self) -> bool;
+    fn is_connected(&self) -> bool;
 
-    fn name(self: &Self) -> String {
+    fn name(&self) -> String {
         format!("{}", self)
     }
 
-    fn id(self: &Self) -> String;
+    fn id(&self) -> String;
 }

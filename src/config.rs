@@ -59,7 +59,7 @@ fn detect_undefined_devices(config: &Config) -> Result<(), Box<dyn Error>> {
         .difference(&device_ids)
         .map(|&x| x.as_str())
         .collect();
-    if undefined_ids.len() > 0 {
+    if !undefined_ids.is_empty() {
         return Err(format!("devices not defined: {}", undefined_ids.join(", ")).into());
     }
     Ok(())
