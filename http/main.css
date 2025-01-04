@@ -46,7 +46,9 @@ button[disabled] {
 
 .control__controls {
   display: flex;
+
   flex-flow: row nowrap;
+  overflow: hidden; /* Prevent oversized tap targets from scrolling page */
 }
 
 .control__pt {
