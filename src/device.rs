@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 pub mod dummy;
+pub mod lanc;
 pub mod lumix;
 pub mod ronin;
 

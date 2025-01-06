@@ -98,6 +98,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     );
                     Box::new(lumix)
                 }
+                config::DeviceConfig::Lanc(lanc_config) => {
+                    let lanc = device::lanc::create(id, &lanc_config.port);
+                    Box::new(lanc)
+                }
             };
             device
         })

@@ -27,6 +27,7 @@ pub enum DeviceConfig {
     Dummy(DummyConfig),
     Ronin(RoninConfig),
     Lumix(LumixConfig),
+    Lanc(LancConfig),
 }
 
 #[derive(Deserialize, Debug)]
@@ -46,6 +47,12 @@ pub struct RoninConfig {
 pub struct LumixConfig {
     pub address: String,
     pub password: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LancConfig {
+    pub port: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
