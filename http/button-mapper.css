@@ -1,0 +1,100 @@
+.mapper__container {
+  display: flex;
+  flex-flow: column nowrap;
+}
+
+.mapper__actions {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem 1rem;
+  text-align: right;
+}
+
+.mapper__groups {
+  flex: 1 1 auto;
+
+  display: flex;
+  flex-flow: column nowrap;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+  padding: 1rem 1rem 0.5rem;
+  gap: 1rem;
+}
+
+.mapper-group {
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+}
+
+.mapper-group__heading {
+  margin: 0 0 1rem;
+  font-size: 2em;
+  border-bottom: 1px solid currentColor;
+}
+
+.mapper-group__heading button {
+  vertical-align: middle;
+}
+
+.mapper-group__inputs {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.mapper-inputs {
+  margin-bottom: 0.25rem;
+
+  display: flex;
+  flex-flow: column nowrap;
+
+  border: 1px solid currentColor;
+}
+
+.mapper-inputs__heading {
+  margin: 0;
+
+  padding: 0.3rem;
+
+  font-size: 1.25em;
+  font-weight: bold;
+  border-bottom: 1px solid currentColor;
+}
+
+.mapper-input {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.25rem;
+
+  border-bottom: 1px solid currentColor;
+}
+
+.mapper-input--changed {
+  color: black;
+  background-color: lightyellow;
+}
+
+.mapper-input__line1 {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25em;
+}
+
+.mapper-input__pill {
+  padding-inline-end: 0.1em;
+
+  color: black;
+  background-color: lightgray;
+  border: 1px solid currentColor;
+  font-family: monospace;
+  font-size: 1.25em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mapper-input__line2 {
+  width: 11em;
+}

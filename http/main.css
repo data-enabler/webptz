@@ -1,3 +1,5 @@
+@import "button-mapper.css";
+
 :root {
   --size: 200px;
   --thumb-size: 24px;
@@ -16,6 +18,29 @@ body {
   gap: 1rem;
 }
 
+::backdrop {
+  background-color: #00000088;
+}
+
+dialog {
+  max-width: calc(100% - 32px);
+  max-height: 100%;
+  box-sizing: border-box;
+
+  padding: 0;
+  border: 3px solid currentColor;
+}
+
+dialog > * {
+  /**
+   * Dialog elements appear to be busted in Firefox, at least, and sizing based
+   * on the parent doesn't work.
+   */
+  min-height: 0;
+  max-height: calc(100vh - 6px);
+  box-sizing: border-box;
+}
+
 .control {
   flex: 0 0 auto;
   width: min-content;
@@ -24,13 +49,19 @@ body {
   word-break: break-all;
 }
 
+.control__header {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem;
+
+  border-bottom: 1px solid currentColor;
+}
+
 .control__name {
   margin: 0;
 
-  padding: 0.2em;
-
-  text-align: center;
-  border-bottom: 1px solid currentColor;
   font-size: 1.25em;
   font-weight: bold;
 }

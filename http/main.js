@@ -1,6 +1,9 @@
-import { html, render, useState } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
+import { html, render, useState, useEffect } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
 
-import { ZERO_STATE, mapDefaultControls, useGamepadPoll } from './controls.js';
+import { ButtonMapper } from './button-mapper.js';
+import { ZERO_STATE, useGamepadPoll } from './controls.js';
+/** @import { Mappings } from './mapping.js'; */
+import { areMappingsEqual } from './mapping.js';
 import { useServer } from './server.js';
 /** @import { ControlStates } from './state.js'; */
 
@@ -9,9 +12,17 @@ function App() {
   const [controlStates, setControlStates] = useState(/** @type {ControlStates} */ (
     Object.fromEntries(state.groups.map((g) => [g.name, ZERO_STATE]))
   ));
-  const [localMappings] = useState(null);
-  const serverMappings = mapDefaultControls(state.groups, state.defaultControls);
-  const mappings = localMappings || serverMappings;
+  const [localMappings, setLocalMappings] = useState(/** @type {Mappings|null} */(null));
+  useEffect(() => {
+    if (
+      localMappings &&
+        state.defaultControls &&
+        areMappingsEqual(localMappings, state.defaultControls)
+    ) {
+      setLocalMappings(null);
+    }
+  }, [localMappings, setLocalMappings, state.defaultControls])
+  const mappings = localMappings || state.defaultControls || {};
   useGamepadPoll({
     groups: state.groups,
     controlStates,
@@ -32,6 +43,11 @@ function App() {
     send({ reconnect: { devices: [id] } });
   }
 
+  /** @type {Mappings} */
+  const defaultMappings = state.defaultControls || {};
+  const buttonMapper = html`
+    <${ButtonMapper} groups=${state.groups} mappings=${mappings} defaultMappings=${defaultMappings} setMappings=${setLocalMappings} />
+  `;
   return state.groups.map(({ name: groupId, devices }) => {
     const s = controlStates[groupId] || ZERO_STATE;
     return html`
@@ -44,7 +60,10 @@ function App() {
           '--zoom': s.zoom,
         }}
       >
-        <h2 class="control__name">${groupId}</h2>
+        <header class="control__header">
+          <h2 class="control__name">${groupId}</h2>
+          ${buttonMapper}
+        </header>
         <div>
           ${devices.map((id) => {
             const d = state.devices[id];
@@ -52,9 +71,9 @@ function App() {
               <div class="control__device">
                 ${d.name}
                 <br/>
-                <button disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
+                <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
                 ${' '}
-                <button disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
+                <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
               </div>
             `;
           })}
@@ -73,7 +92,9 @@ function App() {
   });
 }
 
-render(html`<${App} />`, document.body);
+render(html`
+  <${App} />
+`, document.body);
 
 window.addEventListener('gamepadconnected', (e) => {
   console.log(

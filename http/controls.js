@@ -3,7 +3,7 @@ import { useEffect, useRef, useCallback } from 'https://unpkg.com/htm@^3.1.1/pre
 /** @import { GamepadData, Mapping, Mappings } from './mapping.js'; */
 import { normalizeGamepad, readInputs } from './mapping.js';
 import { useMouseControl, mouseStateToControlState } from './mouse.js';
-/** @import { CommandMessage, Group } from 'server.js'; */
+/** @import { CommandMessage, Group } from './server.js'; */
 /** @import { ControlState, ControlStates } from './state.js'; */
 
 /**
@@ -49,8 +49,15 @@ export function useGamepadPoll({ groups, setControlStates, send, mappings }) {
     if (document.timeline.currentTime == null) {
       return;
     }
+
+    // Limit polling rate to once every POLL_INTERVAL
     const currentTime = /** @type {number} */ (document.timeline.currentTime || 0);
     if (currentTime - lastPoll.current < POLL_INTERVAL) {
+      return;
+    }
+
+    // Ignore inputs while modals are open
+    if (document.querySelector('dialog[open]')) {
       return;
     }
     lastPoll.current = currentTime;
@@ -127,20 +134,6 @@ function readMapping(pads, mapping) {
     roll,
     zoom,
   };
-}
-
-/**
- * @param {Group[]} groups
- * @param {Mapping[]|undefined} defaultControls
- * @returns {Mappings}
- */
-export function mapDefaultControls(groups, defaultControls) {
-  if (defaultControls == null) {
-    return {};
-  }
-  return Object.fromEntries(
-    groups.map((group, i) => [group.name, defaultControls[i]])
-  );
 }
 
 /**

@@ -1,5 +1,6 @@
 {
   "javascript.preferences.importModuleSpecifierEnding": "js",
+  "javascript.preferences.autoImportFileExcludePatterns": ["react"],
   "files.eol": "\n",
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
 }

@@ -1,5 +1,5 @@
 declare module 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js' {
-  import { FunctionComponent } from 'react';
+  import { ReactNode } from 'react';
   export {
     render,
     useState,
@@ -7,7 +7,7 @@ declare module 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js' {
     useRef,
     useCallback,
   } from 'react';
-  export function html(jsx: TemplateStringsArray, ...args: any[]): FunctionComponent;
+  export function html(jsx: TemplateStringsArray, ...args: any[]): ReactNode;
 }
 
 declare module 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js' {

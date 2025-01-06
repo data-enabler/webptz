@@ -1,27 +1,26 @@
 /**
- * @typedef {Pick<Gamepad, "buttons"|"axes"|"id"|"mapping">} GamepadData
+ * @typedef {Pick<Gamepad, "buttons"|"axes"|"index"|"id"|"mapping">} GamepadData
  */
 
 /**
  * @typedef {{
- *   padIndex: number,
- *   type: "axis"|"button",
- *   inputIndex: number,
- *   multiplier: number,
+ *   readonly padIndex: number,
+ *   readonly type: "axis"|"button",
+ *   readonly inputIndex: number,
+ *   readonly multiplier: number,
  * }} PadInput
  */
 
-
 /**
  * @typedef {{
- *   panL: PadInput[],
- *   panR: PadInput[],
- *   tiltU: PadInput[],
- *   tiltD: PadInput[],
- *   rollL: PadInput[],
- *   rollR: PadInput[],
- *   zoomI: PadInput[],
- *   zoomO: PadInput[],
+ *   readonly panL: readonly PadInput[],
+ *   readonly panR: readonly PadInput[],
+ *   readonly tiltU: readonly PadInput[],
+ *   readonly tiltD: readonly PadInput[],
+ *   readonly rollL: readonly PadInput[],
+ *   readonly rollR: readonly PadInput[],
+ *   readonly zoomI: readonly PadInput[],
+ *   readonly zoomO: readonly PadInput[],
  * }} Mapping
  */
 
@@ -29,6 +28,17 @@
  * @typedef {Record<string, Mapping>} Mappings
  */
 
+/** @type {Mapping} */
+export const EMPTY_MAPPING = Object.freeze({
+  panL: [],
+  panR: [],
+  tiltU: [],
+  tiltD: [],
+  rollL: [],
+  rollR: [],
+  zoomI: [],
+  zoomO: [],
+});
 const DEADZONE = 0.1;
 
 /**
@@ -101,6 +111,7 @@ export function normalizeGamepad(pad) {
     return {
       axes,
       buttons,
+      index: pad.index,
       id: pad.id,
       mapping: pad.mapping,
     };
@@ -111,7 +122,7 @@ export function normalizeGamepad(pad) {
 /**
  * Returns the first pressed input
  * @param {(GamepadData|null)[]} pads
- * @param {PadInput[]} inputs
+ * @param {readonly PadInput[]} inputs
  * @returns {number}
  */
 export function readInputs(pads, inputs) {
@@ -154,58 +165,78 @@ function ignoreDeadzone(val) {
 }
 
 /**
- * @returns {Promise<PadInput|null>}
+ * @param {function(PadInput): void} callback
+ * @returns {function(): void} a cancel/cleanup function
  */
-export function waitForGamepadInput() {
-  return new Promise((resolve) => {
-    /**
-     * @param {PadInput|null} val
-     */
-    function resolveWithValue(val) {
-      clearInterval(interval);
-      window.removeEventListener('keydown', keyHandler);
-      resolve(val);
-    }
-
-    function findPressedInput() {
-      for (const pad of navigator.getGamepads()) {
-        if (pad == null) {
-          continue;
+export function waitForGamepadInput(callback) {
+  function findPressedInput() {
+    for (const gamepad of navigator.getGamepads()) {
+      const pad = normalizeGamepad(gamepad);
+      if (pad == null) {
+        continue;
+      }
+      for (let i = 0; i < pad.buttons.length; i++) {
+        if (pad.buttons[i].pressed) {
+          callback({
+            padIndex: pad.index,
+            type: 'button',
+            inputIndex: i,
+            multiplier: 1.0,
+          });
+          return;
         }
-        for (let i = 0; i < pad.buttons.length; i++) {
-          if (pad.buttons[i].pressed) {
-            resolveWithValue({
-              padIndex: pad.index,
-              type: 'button',
-              inputIndex: i,
-              multiplier: 1.0,
-            });
-            return;
-          }
-        }
-        for (let i = 0; i < pad.axes.length; i++) {
-          if (Math.abs(pad.axes[i]) > 0.9) {
-            resolveWithValue({
-              padIndex: pad.index,
-              type: 'axis',
-              inputIndex: i,
-              multiplier: pad.axes[i] > 0 ? 1.0 : -1.0,
-            });
-            return;
-          }
+      }
+      for (let i = 0; i < pad.axes.length; i++) {
+        if (Math.abs(pad.axes[i]) > 0.25) {
+          callback({
+            padIndex: pad.index,
+            type: 'axis',
+            inputIndex: i,
+            multiplier: pad.axes[i] > 0 ? 1.0 : -1.0,
+          });
+          return;
         }
       }
     }
-    const interval = setInterval(findPressedInput, 100);
+  }
+  const interval = setInterval(findPressedInput, 100);
 
-    /**
-     * @param {KeyboardEvent} e
-     */
-    function keyHandler(e) {
-      if (e.key === 'Escape') {
-        resolveWithValue(null);
-      }
-    };
-    window.addEventListener('keydown', keyHandler, { once: true });
-  });
+  return function cleanup() {
+    clearInterval(interval);
+  };
+}
+
+/** @type {PadInput} */
+const EXAMPLE_PADINPUT = Object.freeze({
+  padIndex: 0,
+  type: 'axis',
+  inputIndex: 0,
+  multiplier: 1.0,
+});
+const SORTED_MAPPINGS_KEYS = [
+  ...Object.keys(EMPTY_MAPPING),
+  ...Object.keys(EXAMPLE_PADINPUT),
+];
+/**
+ * @param {Mappings} a
+ * @param {Mappings} b
+ * @returns {boolean}
+ */
+export function areMappingsEqual(a, b) {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+  const keys = Object.keys(a).concat(SORTED_MAPPINGS_KEYS).sort();
+  return JSON.stringify(a, keys) === JSON.stringify(b, keys);
+}
+
+/**
+ * @param {PadInput} a
+ * @param {PadInput} b
+ * @returns {boolean}
+ */
+export function arePadInputsEqual(a, b) {
+  return JSON.stringify(a, SORTED_MAPPINGS_KEYS) === JSON.stringify(b, SORTED_MAPPINGS_KEYS);
 }
