@@ -4,7 +4,7 @@ import { ButtonMapper } from './button-mapper.js';
 import { ZERO_STATE, useGamepadPoll } from './controls.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
-import { useServer } from './server.js';
+import { unmapDefaultControls, useServer } from './server.js';
 /** @import { ControlStates } from './state.js'; */
 
 function App() {
@@ -43,10 +43,23 @@ function App() {
     send({ reconnect: { devices: [id] } });
   }
 
+  /**
+   * @param {Mappings} m
+   */
+  function setDefaultMappings(m) {
+    send({ saveDefaultControls: unmapDefaultControls(state.groups, m) });
+  }
+
   /** @type {Mappings} */
   const defaultMappings = state.defaultControls || {};
   const buttonMapper = html`
-    <${ButtonMapper} groups=${state.groups} mappings=${mappings} defaultMappings=${defaultMappings} setMappings=${setLocalMappings} />
+    <${ButtonMapper}
+      groups=${state.groups}
+      mappings=${mappings}
+      setMappings=${setLocalMappings}
+      defaultMappings=${defaultMappings}
+      setDefaultMappings=${setDefaultMappings}
+    />
   `;
   return state.groups.map(({ name: groupId, devices }) => {
     const s = controlStates[groupId] || ZERO_STATE;

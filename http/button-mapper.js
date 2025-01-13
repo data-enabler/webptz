@@ -10,11 +10,18 @@ import { waitForGamepadInput, EMPTY_MAPPING, arePadInputsEqual } from './mapping
  * @param {{
  *   groups: Group[],
  *   mappings: Mappings,
- *   defaultMappings: Mappings,
  *   setMappings: StateUpdater<Mappings|null>,
+ *   defaultMappings: Mappings,
+ *   setDefaultMappings: function(Mappings): void,
  * }} props
  */
-export function ButtonMapper({ groups, mappings, defaultMappings, setMappings }) {
+export function ButtonMapper({
+  groups,
+  mappings,
+  setMappings,
+  defaultMappings,
+  setDefaultMappings,
+}) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [targetGroup, setTargetGroup] = useState(/** @type {string|null} */(null));
   const [newMappings, setNewMappings] = useState(mappings);
@@ -77,6 +84,11 @@ export function ButtonMapper({ groups, mappings, defaultMappings, setMappings })
     setNewMappings(defaultMappings);
   }
 
+  function saveDefaults() {
+    setMappings(newMappings);
+    setDefaultMappings(newMappings);
+  }
+
   /**
    * @param {PointerEvent} e
    */
@@ -127,7 +139,9 @@ export function ButtonMapper({ groups, mappings, defaultMappings, setMappings })
           ${' '}
           <button type="button" onClick=${clearAll}>Clear All</button>
           ${' '}
-          <button type="button" onClick=${resetAll}>Reset All to Defaults</button>
+          <button type="button" onClick=${resetAll}>Reset All to Default</button>
+          ${' '}
+          <button type="button" onClick=${saveDefaults}>Save as Default</button>
           ${' '}
           <button type="submit" value="save">Save</button>
         </div>

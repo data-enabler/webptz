@@ -34,6 +34,7 @@ enum Operation {
     Disconnect(DisconnectRequest),
     Reconnect(ReconnectRequest),
     Shutdown,
+    SaveDefaultControls(Vec<Mappings>),
 }
 
 #[derive(Serialize, Debug)]
@@ -55,7 +56,7 @@ struct DeviceStatus {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let config = config::load_config().await?;
+    let mut config = config::load_config().await?;
     println!("Config: {:?}", config);
 
     let manager = Manager::new().await?;
@@ -177,6 +178,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 });
                 disconnect_devices(&mut devices).await;
                 break;
+            }
+            Operation::SaveDefaultControls(request) => {
+                println!("Saving button mappings...");
+                config.default_controls = Some(request);
+                config::save_config(&config).await?;
+                state_tx.send_modify(|s| {
+                    s.default_controls = config.default_controls;
+                });
             }
         }
     }
@@ -351,6 +360,7 @@ fn process_message(
                 Request::Command(x) => Operation::Command(x),
                 Request::Disconnect(x) => Operation::Disconnect(x),
                 Request::Reconnect(x) => Operation::Reconnect(x),
+                Request::SaveDefaultControls(x) => Operation::SaveDefaultControls(x),
             };
             match command_tx.send(op) {
                 Ok(_) => (),
@@ -382,6 +392,7 @@ enum Request {
     Command(CommandRequest),
     Disconnect(DisconnectRequest),
     Reconnect(ReconnectRequest),
+    SaveDefaultControls(Vec<Mappings>),
 }
 
 #[derive(Deserialize, Debug)]

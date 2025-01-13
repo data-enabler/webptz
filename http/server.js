@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact
 import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
 
 /** @import { Mapping, Mappings } from './mapping.js'; */
+import { EMPTY_MAPPING } from './mapping.js';
 
 /**
  * @typedef {{
@@ -19,6 +20,12 @@ import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4
  * @typedef {{
  *   reconnect: { devices: string[] },
  * }} ReconnectMessage
+ */
+
+/**
+ * @typedef {{
+ *   saveDefaultControls: Mapping[],
+ * }} SaveDefaultControlsMessage
  */
 
 /**
@@ -67,7 +74,7 @@ import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4
 /**
  * @return {{
  *   state: ServerState,
- *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage): void,
+ *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage|SaveDefaultControlsMessage): void,
  * }}
  */
 export function useServer() {
@@ -139,4 +146,13 @@ export function mapDefaultControls(groups, defaultControls) {
   return Object.fromEntries(
     groups.map((group, i) => [group.name, defaultControls[i]])
   );
+}
+
+/**
+ * @param {Group[]} groups
+ * @param {Mappings} controls
+ * @returns {Mapping[]}
+ */
+export function unmapDefaultControls(groups, controls) {
+  return groups.map((group) => controls[group.name] || EMPTY_MAPPING);
 }

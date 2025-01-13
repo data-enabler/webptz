@@ -6,7 +6,7 @@ use std::{
     error::Error,
 };
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub groups: Vec<Group>,
@@ -21,7 +21,7 @@ pub struct Group {
     pub devices: Vec<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum DeviceConfig {
     Dummy(DummyConfig),
@@ -30,26 +30,26 @@ pub enum DeviceConfig {
     Lanc(LancConfig),
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DummyConfig {
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RoninConfig {
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LumixConfig {
     pub address: String,
     pub password: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LancConfig {
     pub port: String,
@@ -91,6 +91,19 @@ pub async fn load_config() -> Result<Config, Box<dyn Error>> {
     check_duplicate_group_names(&config)?;
     detect_undefined_devices(&config)?;
     Ok(config)
+}
+
+pub async fn save_config(config: &Config) -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = env::args().collect();
+    let config_path = match args.get(1) {
+        Some(path) => path,
+        None => {
+            return Err("no config path provided".into());
+        }
+    };
+    let content = serde_json::to_string_pretty(config)?;
+    tokio::fs::write(config_path, content).await?;
+    Ok(())
 }
 
 fn check_duplicate_group_names(config: &Config) -> Result<(), Box<dyn Error>> {
