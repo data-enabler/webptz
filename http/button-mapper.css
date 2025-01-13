@@ -43,6 +43,8 @@
 }
 
 .mapper-inputs {
+  box-sizing: border-box;
+  min-width: 11em;
   margin-bottom: 0.25rem;
 
   display: flex;
