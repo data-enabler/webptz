@@ -12,11 +12,12 @@ btleplug = "0.11.6"
 crc = "3.2.1"
 futures = "0.3.31"
 hex = "0.4.3"
+indexmap = { version = "2.7.0", features = ["serde"] }
 itertools = "0.13.0"
 quick-xml = { version = "0.37.0", features = ["serialize"] }
 reqwest = "0.12.9"
 serde = { version = "1.0.215", features = ["derive"] }
-serde_json = "1.0.132"
+serde_json = { version = "1.0.132", features = ["preserve_order"] }
 socket2 = "0.5.7"
 tokio = { version = "1.41.1", features = ["full"] }
 tokio-serial = "5.4.5"

@@ -1,16 +1,13 @@
+use indexmap::IndexMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    error::Error,
-};
+use std::{collections::HashSet, env, error::Error};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub groups: Vec<Group>,
-    pub devices: HashMap<String, DeviceConfig>,
+    pub devices: IndexMap<String, DeviceConfig>,
     pub default_controls: Option<Vec<Mappings>>,
 }
 
@@ -131,7 +128,7 @@ fn test_check_duplicate_group_names() {
                 devices: vec![],
             },
         ],
-        devices: HashMap::new(),
+        devices: IndexMap::new(),
         default_controls: None,
     };
     assert!(check_duplicate_group_names(&config).is_err());
@@ -167,7 +164,7 @@ fn test_detect_undefined_devices() {
                 devices: vec!["device2".to_string()],
             },
         ],
-        devices: HashMap::from([
+        devices: IndexMap::from([
             (
                 "device1".to_string(),
                 DeviceConfig::Dummy(DummyConfig {
