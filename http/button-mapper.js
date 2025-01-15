@@ -1,4 +1,4 @@
-import { html, useEffect, useRef, useState } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
+import { html, useEffect, useRef, useState } from 'htm/preact';
 
 /** @import { StateUpdater } from './hooks.js'; */
 import { useLocalState } from './hooks.js';

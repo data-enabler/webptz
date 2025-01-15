@@ -1,4 +1,4 @@
-import { html, render, useState, useEffect } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
+import { html, render, useState, useEffect } from 'htm/preact';
 
 import { ButtonMapper } from './button-mapper.js';
 import { ZERO_STATE, useGamepadPoll } from './controls.js';

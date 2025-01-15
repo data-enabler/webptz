@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
+import { useEffect, useRef } from 'htm/preact';
 
 /** @import { ControlState } from './state.js'; */
 

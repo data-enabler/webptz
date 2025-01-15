@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
+import { useEffect, useRef, useCallback } from 'htm/preact';
 
 /** @import { GamepadData, Mapping, Mappings } from './mapping.js'; */
 import { normalizeGamepad, readInputs } from './mapping.js';

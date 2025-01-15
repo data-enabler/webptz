@@ -1,4 +1,4 @@
-declare module 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js' {
+declare module 'htm/preact' {
   import { ReactNode } from 'react';
   export {
     render,
@@ -10,7 +10,7 @@ declare module 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js' {
   export function html(jsx: TemplateStringsArray, ...args: any[]): ReactNode;
 }
 
-declare module 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js' {
+declare module 'reconnecting-websocket' {
   declare namespace ReconnectingWebSocket {
     interface Options {
       WebSocket?: any;

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'https://unpkg.com/htm@^3.1.1/preact/standalone.module.js';
-import ReconnectingWebSocket from 'https://unpkg.com/reconnecting-websocket@^4.4.0/dist/reconnecting-websocket-mjs.js';
+import { useState, useEffect, useRef } from 'htm/preact';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 /** @import { Mapping, Mappings } from './mapping.js'; */
 import { EMPTY_MAPPING } from './mapping.js';
