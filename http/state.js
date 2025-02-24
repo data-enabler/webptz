@@ -74,3 +74,33 @@ export function isZero(state) {
     state.focus === 0 &&
     state.autofocus.active === false;
 }
+
+/**
+ * @param {ControlStates} a
+ * @param {ControlStates} b
+ * @returns {ControlStates}
+ */
+export function mergeStates(a, b) {
+  return Object.fromEntries(
+    Object.keys(a).map(groupId => [groupId, mergeState(a[groupId], b[groupId])])
+  );
+}
+
+/**
+ * @param {ControlState} a
+ * @param {ControlState|undefined} b
+ * @returns {ControlState}
+ */
+function mergeState(a, b) {
+  return {
+    pan: b?.pan || a.pan,
+    tilt: b?.tilt || a.tilt,
+    roll: b?.roll || a.roll,
+    zoom: b?.zoom || a.zoom,
+    focus: b?.focus || a.focus,
+    autofocus: {
+      pressed: b?.autofocus.pressed || a.autofocus.pressed,
+      active: b?.autofocus.active || a.autofocus.active,
+    },
+  };
+}

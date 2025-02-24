@@ -1,83 +1,138 @@
 import { useEffect, useRef } from 'htm/preact';
 
-/** @import { ControlState } from './state.js'; */
+/** @import { ControlState, ControlStates } from './state.js'; */
 import { ZERO_STATE } from './state.js';
 
 /**
  * @typedef {{
- *   groupId: string|null,
- *   type: 'pan-tilt'|'zoom'|'focus',
+ *   touchId: number|null,
  *   origin: number[],
  *   currXY: number[],
  *   range: number,
+ * }} JoystickControl
+ */
+
+/**
+ * @typedef {{
+ *   joysticks: {
+ *     panTilt: JoystickControl;
+ *     zoom: JoystickControl;
+ *     focus: JoystickControl;
+ *   };
+ *   buttons: {
+ *     autofocus: boolean;
+ *   };
  * }} MouseControl
  */
 
 /**
+ * @typedef {Record<string, MouseControl>} MouseControls
+ */
+
+/**
+ * @typedef {{
+ *   target: EventTarget,
+ *   identifier: number,
+ *   clientX: number,
+ *   clientY: number,
+ * }} PointerEvent
+ */
+
+const MOUSE_IDENTIFIER = -1;
+
+/**
  * @returns {{
- *   current: MouseControl,
+ *   current: MouseControls,
  * }}
  */
 export function useMouseControl() {
-  /** @type {MouseControl} */
-  const initialVal = {
-    groupId: null,
-    type: 'pan-tilt',
-    origin: [0, 0],
-    currXY: [0, 0],
-    range: 0,
-  };
-  /** @type {{current: MouseControl}} */
-  const ref = useRef(initialVal);
+  /** @type {{current: MouseControls}} */
+  const ref = useRef({});
   useEffect(() => {
     /**
      * @param {MouseEvent|TouchEvent} e
      */
     const startDrag = function (e) {
-      if (e.target == null) {
-        return;
+      const pointerEvents = e instanceof MouseEvent ? [{
+        identifier: MOUSE_IDENTIFIER,
+        target: e.target,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      }] : e.changedTouches;
+
+      for (const touch of pointerEvents) {
+        const target = /** @type {HTMLElement} */ (touch.target);
+        if (!target.matches('.js-joystick')) {
+          continue;
+        }
+        e.preventDefault();
+        const groupId = target.dataset.groupId;
+        const type = /** @type {(keyof MouseControl['joysticks'])|undefined} */(target.dataset.type);
+        if (!groupId || !type) {
+          return;
+        }
+
+        const currXY = [touch.clientX, touch.clientY];
+        const joystick = getJoystick(ref, groupId, type);
+        // If the joystick is already being dragged, try to keep the original
+        // origin so that the joystick doesn't snap back to the center
+        const prevXOffset = -1 * joystick.currXY[0] + joystick.origin[0];
+        const prevYOffset = -1 * joystick.currXY[1] + joystick.origin[1];
+        joystick.touchId = touch.identifier;
+        joystick.origin = [currXY[0] + prevXOffset, currXY[1] + prevYOffset];
+        joystick.currXY = currXY;
+        joystick.range = (target.parentElement?.clientHeight || 0) / 2;
       }
-      const target = /** @type {HTMLElement} */ (e.target);
-      if (!target.matches('.js-pt-joystick, .js-zoom-joystick, .js-focus-joystick')) {
-        return;
-      }
-      e.preventDefault();
-      const targetControl = /** @type {HTMLElement|null} */ (target.closest('.js-control'));
-      const groupId = targetControl?.dataset.groupId;
-      if (!groupId) {
-        return;
-      }
-      const origin = e instanceof MouseEvent
-        ? [e.clientX, e.clientY]
-        : [e.touches[0].clientX, e.touches[0].clientY];
-      /** @type {MouseControl} */
-      const control = {
-        groupId,
-        type: target.matches('.js-zoom-joystick') ? 'zoom' : (target.matches('.js-focus-joystick') ? 'focus' : 'pan-tilt'),
-        origin,
-        currXY: origin,
-        range: (target.parentElement?.clientHeight || 0) / 2,
-      };
-      Object.assign(ref.current, control);
     };
+
     /**
      * @param {MouseEvent|TouchEvent} e
      */
-    const move = function (e) {
-      if (ref.current.groupId != null) {
+    const moveDrag = function (e) {
+      const pointerEvents = e instanceof MouseEvent ? [{
+        identifier: MOUSE_IDENTIFIER,
+        target: e.target,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      }] : e.changedTouches;
+
+      for (const touch of pointerEvents) {
+        const joystick = getJoystickByTouchId(ref, touch.identifier);
+        if (joystick == null) {
+          continue;
+        }
         e.preventDefault();
-        ref.current.currXY = e instanceof MouseEvent
-          ? [e.clientX, e.clientY]
-          : [e.touches[0].clientX, e.touches[0].clientY];
+        joystick.currXY = [touch.clientX, touch.clientY];
       }
     };
-    const endDrag = function () {
-      ref.current.groupId = null;
+
+    /**
+     * @param {MouseEvent|TouchEvent} e
+     */
+    const endDrag = function (e) {
+      const pointerEvents = e instanceof MouseEvent ? [{
+        identifier: MOUSE_IDENTIFIER,
+        target: e.target,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      }] : e.changedTouches;
+
+      for (const touch of pointerEvents) {
+        const joystick = getJoystickByTouchId(ref, touch.identifier);
+        if (joystick == null) {
+          continue;
+        }
+        e.preventDefault();
+        joystick.touchId = null;
+        joystick.origin = [0, 0];
+        joystick.currXY = [0, 0];
+        joystick.range = 0;
+      }
     };
     document.documentElement.addEventListener('mousedown', startDrag);
     document.documentElement.addEventListener('touchstart', startDrag, { passive: false });
-    document.documentElement.addEventListener('mousemove', move);
-    document.documentElement.addEventListener('touchmove', move, { passive: false });
+    document.documentElement.addEventListener('mousemove', moveDrag);
+    document.documentElement.addEventListener('touchmove', moveDrag, { passive: false });
     document.documentElement.addEventListener('mouseup', endDrag);
     document.documentElement.addEventListener('touchend', endDrag);
     document.documentElement.addEventListener('mouseleave', endDrag);
@@ -85,8 +140,8 @@ export function useMouseControl() {
     return function cleanup() {
       document.documentElement.removeEventListener('mousedown', startDrag);
       document.documentElement.removeEventListener('touchstart', startDrag);
-      document.documentElement.removeEventListener('mousemove', move);
-      document.documentElement.removeEventListener('touchmove', move);
+      document.documentElement.removeEventListener('mousemove', moveDrag);
+      document.documentElement.removeEventListener('touchmove', moveDrag);
       document.documentElement.removeEventListener('mouseup', endDrag);
       document.documentElement.removeEventListener('touchend', endDrag);
       document.documentElement.removeEventListener('mouseleave', endDrag);
@@ -95,36 +150,76 @@ export function useMouseControl() {
   }, []);
   return ref;
 }
+
+/**
+ * @param {{ current: MouseControls }} ref
+ * @param {number} identifier
+ * @returns {JoystickControl|null}
+ */
+function getJoystickByTouchId(ref, identifier) {
+  for (const [_, control] of Object.entries(ref.current)) {
+    for (const [_, joystick] of Object.entries(control.joysticks)) {
+      if (joystick.touchId === identifier) {
+        return joystick;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {{ current: MouseControls }} ref
+ * @param {string} groupId
+ * @param {keyof MouseControl['joysticks']} type
+ * @returns {JoystickControl}
+ */
+function getJoystick(ref, groupId, type) {
+  ref.current[groupId] = ref.current[groupId] || newMouseControl();
+  const joystick = ref.current[groupId].joysticks[type];
+  return joystick;
+}
+
+/**
+ * @returns {MouseControl}
+ */
+function newMouseControl() {
+  return {
+    joysticks: {
+      panTilt: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
+      zoom: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
+      focus: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
+    },
+    buttons: {
+      autofocus: false,
+    },
+  };
+}
+
+/**
+ * @param {MouseControls} c
+ * @param {ControlStates} lastStates
+ * @return {ControlStates}
+ */
+export function mouseControlsToControlStates(c, lastStates) {
+  /** @type {ControlStates} */
+  const states = {};
+  for (const [groupId, control] of Object.entries(c)) {
+    const lastState = lastStates[groupId] || ZERO_STATE;
+    const newState = mouseControlToControlState(control, lastState);
+    states[groupId] = newState;
+  }
+  return states;
+}
+
 /**
  * @param {MouseControl} c
  * @param {ControlState} lastState
  * @return {ControlState}
  */
-export function mouseStateToControlState(c, lastState) {
-  if (c.range === 0) {
-    return ZERO_STATE;
-  }
-  let pan = 0;
-  let tilt = 0;
-  let zoom = 0;
-  let focus = 0;
-  if (c.type === 'pan-tilt') {
-    const deltaX = c.currXY[0] - c.origin[0];
-    const deltaY = -1 * (c.currXY[1] - c.origin[1]);
-    const angle = Math.atan2(deltaY, deltaX);
-    const unclamped = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / c.range;
-    const magnitude = Math.min(Math.max(unclamped, -1), 1);
-    pan = magnitude * Math.cos(angle);
-    tilt = magnitude * Math.sin(angle);
-  }
-  if (c.type === 'zoom') {
-    const unclamped = -1 * (c.currXY[1] - c.origin[1]) / c.range;
-    zoom = Math.min(Math.max(unclamped, -1), 1);
-  }
-  if (c.type === 'focus') {
-    const unclamped = -1 * (c.currXY[1] - c.origin[1]) / c.range;
-    focus = Math.min(Math.max(unclamped, -1), 1);
-  }
+export function mouseControlToControlState(c, lastState) {
+  const [pan, tilt] = getAxes(c.joysticks.panTilt);
+  const zoom = getAxis(c.joysticks.zoom);
+  const focus = getAxis(c.joysticks.focus);
   return {
     pan,
     tilt,
@@ -133,4 +228,35 @@ export function mouseStateToControlState(c, lastState) {
     focus,
     autofocus: lastState.autofocus,
   };
+}
+
+/**
+ * @param {JoystickControl} j
+ * @returns {number}
+ */
+function getAxis(j) {
+  if (j.range === 0) {
+    return 0
+  }
+  const unclamped = -1 * (j.currXY[1] - j.origin[1]) / j.range;
+  const y = Math.min(Math.max(unclamped, -1), 1);
+  return y;
+}
+
+/**
+ * @param {JoystickControl} j
+ * @returns {[number, number]}
+ */
+function getAxes(j) {
+  if (j.range === 0) {
+    return [0, 0];
+  }
+  const deltaX = j.currXY[0] - j.origin[0];
+  const deltaY = -1 * (j.currXY[1] - j.origin[1]);
+  const angle = Math.atan2(deltaY, deltaX);
+  const unclamped = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / j.range;
+  const magnitude = Math.min(Math.max(unclamped, -1), 1);
+  const x = magnitude * Math.cos(angle);
+  const y = magnitude * Math.sin(angle);
+  return [x, y];
 }

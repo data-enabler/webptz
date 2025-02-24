@@ -28,7 +28,7 @@
  */
 
 /**
- * @typedef {Record<string, Mapping>} Mappings
+ * @typedef {Record<string, Mapping|undefined>} Mappings
  */
 
 /** @type {Mapping} */

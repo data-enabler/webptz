@@ -97,15 +97,15 @@ function App() {
         <div class="control__controls">
           <div class="control__pt">
             <div class="control__pt-bg"></div>
-            <div class="control__pt-joystick js-pt-joystick"></div>
+            <div class="control__pt-joystick js-joystick" data-group-id=${groupId} data-type="panTilt"></div>
           </div>
           <div class="control__zoom">
-            <div class="control__zoom-joystick js-zoom-joystick"></div>
+            <div class="control__zoom-joystick js-joystick" data-group-id=${groupId} data-type="zoom"></div>
           </div>
           <div class="control__focus-column">
             <!-- <button type="button" title="1-Shot Auto-Focus">AF</button> -->
             <div class="control__focus">
-              <div class="control__focus-joystick js-focus-joystick"></div>
+              <div class="control__focus-joystick js-joystick" data-group-id=${groupId} data-type="focus"></div>
             </div>
           </div>
         </div>

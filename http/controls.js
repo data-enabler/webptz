@@ -2,10 +2,10 @@ import { useEffect, useRef, useCallback } from 'htm/preact';
 
 /** @import { GamepadData, Mapping, Mappings } from './mapping.js'; */
 import { normalizeGamepad, readInputs } from './mapping.js';
-import { useMouseControl, mouseStateToControlState } from './mouse.js';
+import { useMouseControl, mouseControlsToControlStates } from './mouse.js';
 /** @import { CommandMessage, Group } from './server.js'; */
 /** @import { ControlState, ControlStates } from './state.js'; */
-import { allStatesEqual, isZero, ZERO_STATE } from './state.js';
+import { allStatesEqual, isZero, mergeStates, ZERO_STATE } from './state.js';
 
 /**
  * @typedef {{
@@ -57,11 +57,10 @@ export function useGamepadPoll({ groups, setControlStates, send, mappings }) {
       return;
     }
     lastPoll.current = currentTime;
-    const controlStates = readGamepads(mappings, lastStates.current);
-    if (mouseControlRef.current.groupId != null) {
-      controlStates[mouseControlRef.current.groupId] =
-        mouseStateToControlState(mouseControlRef.current, lastStates.current[mouseControlRef.current.groupId]);
-    }
+    const controlStates = mergeStates(
+      readGamepads(mappings, lastStates.current),
+      mouseControlsToControlStates(mouseControlRef.current, lastStates.current),
+    );
 
     // Limit unnecessary re-renders by only updating state when the values change
     if (!allStatesEqual(lastStates.current, controlStates)) {
@@ -115,7 +114,7 @@ export function readGamepads(mappings, prevStates) {
   const pads = navigator.getGamepads().map(normalizeGamepad);
   return Object.fromEntries(
     Object.entries(mappings)
-      .map(([groupId, m]) => [groupId, readMapping(pads, m, prevStates[groupId])])
+      .map(([groupId, m]) => [groupId, readMapping(pads, m || {}, prevStates[groupId])])
   );
 }
 
