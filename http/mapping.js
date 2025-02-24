@@ -13,14 +13,17 @@
 
 /**
  * @typedef {{
- *   readonly panL: readonly PadInput[],
- *   readonly panR: readonly PadInput[],
- *   readonly tiltU: readonly PadInput[],
- *   readonly tiltD: readonly PadInput[],
- *   readonly rollL: readonly PadInput[],
- *   readonly rollR: readonly PadInput[],
- *   readonly zoomI: readonly PadInput[],
- *   readonly zoomO: readonly PadInput[],
+ *   readonly panL?: readonly PadInput[],
+ *   readonly panR?: readonly PadInput[],
+ *   readonly tiltU?: readonly PadInput[],
+ *   readonly tiltD?: readonly PadInput[],
+ *   readonly rollL?: readonly PadInput[],
+ *   readonly rollR?: readonly PadInput[],
+ *   readonly zoomI?: readonly PadInput[],
+ *   readonly zoomO?: readonly PadInput[],
+ *   readonly focusF?: readonly PadInput[],
+ *   readonly focusN?: readonly PadInput[],
+ *   readonly focusA?: readonly PadInput[],
  * }} Mapping
  */
 
@@ -38,6 +41,9 @@ export const EMPTY_MAPPING = Object.freeze({
   rollR: [],
   zoomI: [],
   zoomO: [],
+  focusF: [],
+  focusN: [],
+  focusA: [],
 });
 const DEADZONE = 0.1;
 
@@ -122,10 +128,13 @@ export function normalizeGamepad(pad) {
 /**
  * Returns the first pressed input
  * @param {(GamepadData|null)[]} pads
- * @param {readonly PadInput[]} inputs
+ * @param {(readonly PadInput[])|undefined} inputs
  * @returns {number}
  */
 export function readInputs(pads, inputs) {
+  if (inputs == null) {
+    return 0;
+  }
   for (const input of inputs) {
     const val = readInput(pads, input);
     if (val !== 0) {

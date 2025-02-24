@@ -1,7 +1,6 @@
 import { html, useEffect, useRef, useState } from 'htm/preact';
 
 /** @import { StateUpdater } from './hooks.js'; */
-import { useLocalState } from './hooks.js';
 /** @import { Mapping, Mappings, PadInput } from './mapping.js'; */
 import { waitForGamepadInput, EMPTY_MAPPING, arePadInputsEqual } from './mapping.js';
 /** @import { Group } from './server.js'; */
@@ -61,7 +60,7 @@ export function ButtonMapper({
         const [groupId, inputId] = target;
         const mapping = m[groupId] || EMPTY_MAPPING;
         // I don't know why TypeScript doesn't like this without the superfluous type cast
-        const existingPadInputs = mapping[/** @type {keyof Mapping} */(inputId)];
+        const existingPadInputs = mapping[/** @type {keyof Mapping} */(inputId)] || [];
         /** @type {Mappings} */
         const updated = {
           ...m,
@@ -220,6 +219,11 @@ function MapperGroup({
           ${mappedInputs('rollL')}
           ${mappedInputs('rollR')}
         </div>
+        <div>
+          ${mappedInputs('focusF')}
+          ${mappedInputs('focusN')}
+        </div>
+        ${mappedInputs('focusA')}
       </div>
     </div>
   `;
@@ -243,8 +247,8 @@ function MappedInputs({
   isTarget,
   makeTarget,
 }) {
-  const padInputs = mapping[inputName];
-  const defaultPadInputs = defaultMapping[inputName];
+  const padInputs = mapping[inputName] || [];
+  const defaultPadInputs = defaultMapping[inputName] || [];
   return html`
     <section class="mapper-inputs">
       <h3 class="mapper-inputs__heading">${getInputNameDisplayValue(inputName)}</h3>
@@ -285,7 +289,7 @@ function MappedInput({
    */
   function setMultiplier(val) {
     setMapping(m => {
-      const padInputs = m[inputName].slice();
+      const padInputs = m[inputName]?.slice() || [];
       padInputs[index] = { ...padInputs[index], multiplier: val * sign };
       /** @type {Mapping} */
       const updated = { ...m, [inputName]: padInputs };
@@ -294,13 +298,34 @@ function MappedInput({
   }
   function remove() {
     setMapping(m => {
-      const padInputs = m[inputName].slice();
+      const padInputs = m[inputName]?.slice() || [];
       padInputs.splice(index, 1);
       /** @type {Mapping} */
       const updated = { ...m, [inputName]: padInputs };
       return updated;
     });
   }
+
+  if (inputName === 'focusA') {
+    return html`
+      <div class="mapper-input ${changed ? 'mapper-input--changed' : ''}">
+        <div class="mapper-input__line1">
+          <span>
+            <span className="mapper-input__pill">
+              🎮#${padInput.padIndex}
+            </span>
+            ${' '}
+            <span className="mapper-input__pill">
+              ${getInputTypeDisplayValue(padInput.type)}#${padInput.inputIndex}
+            </span>
+          </span>
+          ${' '}
+          <button type="button" aria-label="Remove" onClick=${remove}>X</button>
+        </div>
+      </div>
+    `;
+  }
+
   return html`
     <div class="mapper-input ${changed ? 'mapper-input--changed' : ''}">
       <div class="mapper-input__line1">
@@ -358,5 +383,8 @@ function getInputNameDisplayValue(name) {
     case 'rollR': return 'Roll Right';
     case 'zoomI': return 'Zoom In';
     case 'zoomO': return 'Zoom Out';
+    case 'focusF': return 'Focus Far';
+    case 'focusN': return 'Focus Near';
+    case 'focusA': return 'Auto-Focus';
   }
 }

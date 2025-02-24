@@ -128,7 +128,7 @@ button[disabled] {
   box-sizing: border-box;
 }
 
-.control__pt-joystick, .control__zoom-joystick {
+.control__pt-joystick, .control__zoom-joystick, .control__focus-joystick {
   position: absolute;
   left: 50%;
   bottom: 50%;
@@ -142,7 +142,7 @@ button[disabled] {
   transition: transform linear 0.0333s;
 }
 
-.control__pt-joystick::before, .control__zoom-joystick::before {
+.control__pt-joystick::before, .control__zoom-joystick::before, .control__focus-joystick::before {
   content: '';
   display: block;
   position: absolute;
@@ -159,7 +159,7 @@ button[disabled] {
   border-radius: 50%;
 }
 
-.control__zoom-joystick::before {
+.control__zoom-joystick::before, .control__focus-joystick::before {
   width: var(--tap-size);
   height: var(--size);
   border-radius: calc(var(--tap-size) / 2);
@@ -172,7 +172,7 @@ button[disabled] {
   );
 }
 
-.control__zoom {
+.control__zoom, .control__focus {
   position: relative;
   width: var(--thumb-size);
   height: var(--size);
@@ -180,14 +180,43 @@ button[disabled] {
   flex: 0 0 auto;
   margin: 0.3rem;
 
+  isolation: isolate;
+
   background: gray;
-  border: calc(var(--thumb-size) / 2) solid transparent;
   border-radius: calc(var(--thumb-size) / 2);
 }
+
+.control__zoom::before, .control__zoom::after, .control__focus::before, .control__focus::after {
+  left: 50%;
+  position: absolute;
+  z-index: -1;
+}
+
+.control__zoom::before, .control__focus::before {
+  top: calc(var(--thumb-size) / 2);
+  transform: translate(-50%, -50%);
+}
+
+.control__zoom::after, .control__focus::after {
+  bottom: calc(var(--thumb-size) / 2);
+  transform: translate(-50%, 50%);
+}
+
+.control__zoom::before { content: 'T'; }
+.control__zoom::after { content: 'W'; }
+.control__focus::before { content: 'F'; }
+.control__focus::after { content: 'N'; }
 
 .control__zoom-joystick {
   transform: translate(
     -50%,
     calc(50% + -0.5 * var(--zoom) * calc(var(--size) - var(--thumb-size)))
+  );
+}
+
+.control__focus-joystick {
+  transform: translate(
+    -50%,
+    calc(50% + -0.5 * var(--focus) * calc(var(--size) - var(--thumb-size)))
   );
 }

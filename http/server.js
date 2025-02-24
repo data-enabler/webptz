@@ -3,6 +3,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 
 /** @import { Mapping, Mappings } from './mapping.js'; */
 import { EMPTY_MAPPING } from './mapping.js';
+/** @import { ControlState } from './state.js'; */
 
 /**
  * @typedef {{
@@ -29,12 +30,9 @@ import { EMPTY_MAPPING } from './mapping.js';
  */
 
 /**
- * @typedef {{
+ * @typedef {Omit<ControlState, 'autofocus'> & {
  *   devices: string[],
- *   pan: number,
- *   tilt: number,
- *   roll: number,
- *   zoom: number,
+ *   autofocus: boolean,
  * }} Data
  */
 
@@ -128,8 +126,9 @@ export function useServer() {
       if (!ws.current) {
         return;
       }
-      console.log('Sending', data);
-      ws.current.send(JSON.stringify(data));
+      const json = JSON.stringify(data);
+      console.log('Sending', json);
+      ws.current.send(json);
     },
   };
 }

@@ -1,11 +1,12 @@
 import { html, render, useState, useEffect } from 'htm/preact';
 
 import { ButtonMapper } from './button-mapper.js';
-import { ZERO_STATE, useGamepadPoll } from './controls.js';
+import { useGamepadPoll } from './controls.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
 import { unmapDefaultControls, useServer } from './server.js';
 /** @import { ControlStates } from './state.js'; */
+import { ZERO_STATE } from './state.js';
 
 function App() {
   const { state, send } = useServer();
@@ -71,6 +72,8 @@ function App() {
           '--tilt': s.tilt,
           '--roll': s.roll,
           '--zoom': s.zoom,
+          '--focus': s.focus,
+          '--autofocus': s.autofocus.pressed ? 1 : 0,
         }}
       >
         <header class="control__header">
@@ -98,6 +101,12 @@ function App() {
           </div>
           <div class="control__zoom">
             <div class="control__zoom-joystick js-zoom-joystick"></div>
+          </div>
+          <div class="control__focus-column">
+            <!-- <button type="button" title="1-Shot Auto-Focus">AF</button> -->
+            <div class="control__focus">
+              <div class="control__focus-joystick js-focus-joystick"></div>
+            </div>
           </div>
         </div>
       </div>

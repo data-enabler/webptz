@@ -116,11 +116,42 @@ impl CommandPacket {
             param5: 0x00000000,
         }
     }
+
+    const fn one_shot_af(transaction_id: u32) -> CommandPacket {
+        CommandPacket {
+            length: 0x26,
+            packet_type: 0x06,
+            phase_info: 0x01,
+            opcode: 0x9405,
+            transaction_id,
+            param1: 0x03000024,
+            param2: 0x00000000,
+            param3: 0x00000000,
+            param4: 0x00000000,
+            param5: 0x00000000,
+        }
+    }
+
+    const fn adjust_focus(transaction_id: u32) -> CommandPacket {
+        CommandPacket {
+            length: 0x26,
+            packet_type: 0x06,
+            phase_info: 0x02,
+            opcode: 0x9416,
+            transaction_id,
+            param1: 0x03010011,
+            param2: 0x00000000,
+            param3: 0x00000000,
+            param4: 0x00000000,
+            param5: 0x00000000,
+        }
+    }
 }
 
 enum DataPacket {
     ZoomStart(ZoomStartDataPacket),
     ZoomStop(ZoomStopDataPacket),
+    FocusAdjust(FocusAdjustDataPacket),
 }
 
 #[derive(Debug, Serialize)]
@@ -134,8 +165,20 @@ pub struct ZoomStartDataPacket {
     param1: u32,
     unknown2: u32,
     dir: u16,
-    // Values are 0 (stop), 1 (low), 2 (high)
     speed: u16,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum ZoomDirection {
+    Wide = 0x00,
+    Tele = 0x01,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum ZoomSpeed {
+    Off = 0x00,
+    Low = 0x01,
+    High = 0x02,
 }
 
 impl Display for ZoomStartDataPacket {
@@ -143,20 +186,28 @@ impl Display for ZoomStartDataPacket {
         let data_hex = hex::encode(bincode::serialize(&self).unwrap());
         write!(
             f,
-            "{} {} {} {} {} {} {}",
+            "{} {} {} {} {} {} {} {} {} {}",
             &data_hex[0..8],
             &data_hex[8..16],
             &data_hex[16..24],
             &data_hex[24..40],
             &data_hex[40..56],
             &data_hex[56..64],
-            &data_hex[64..]
+            &data_hex[64..72],
+            &data_hex[72..80],
+            &data_hex[80..84],
+            &data_hex[84..],
         )
     }
 }
 
 impl ZoomStartDataPacket {
-    pub const fn create(transaction_id: u32, param1: u32, dir: u16, speed: u16) -> Self {
+    const fn create(
+        transaction_id: u32,
+        param1: u32,
+        dir: ZoomDirection,
+        speed: ZoomSpeed,
+    ) -> Self {
         ZoomStartDataPacket {
             length: 0x14,
             packet_type: 0x09,
@@ -166,8 +217,8 @@ impl ZoomStartDataPacket {
             transaction_id2: transaction_id,
             param1,
             unknown2: 0x04,
-            dir,
-            speed,
+            dir: dir as u16,
+            speed: speed as u16,
         }
     }
 }
@@ -189,14 +240,15 @@ impl Display for ZoomStopDataPacket {
         let data_hex = hex::encode(bincode::serialize(&self).unwrap());
         write!(
             f,
-            "{} {} {} {} {} {} {}",
+            "{} {} {} {} {} {} {} {}",
             &data_hex[0..8],
             &data_hex[8..16],
             &data_hex[16..24],
             &data_hex[24..40],
             &data_hex[40..56],
             &data_hex[56..64],
-            &data_hex[64..]
+            &data_hex[64..72],
+            &data_hex[72..],
         )
     }
 }
@@ -216,6 +268,63 @@ impl ZoomStopDataPacket {
     }
 }
 
+#[derive(Debug, Serialize)]
+struct FocusAdjustDataPacket {
+    length: u32,
+    packet_type: u32,
+    transaction_id: u32,
+    data_length: u64,
+    unknown1: u64,
+    transaction_id2: u32,
+    param1: u32,
+    unknown2: u32,
+    speed: u16,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum FocusAdjustSpeed {
+    Stop = 0x00,
+    FarFast = 0x01,
+    FarSlow = 0x02,
+    NearSlow = 0x03,
+    NearFast = 0x04,
+}
+
+impl Display for FocusAdjustDataPacket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let data_hex = hex::encode(bincode::serialize(&self).unwrap());
+        write!(
+            f,
+            "{} {} {} {} {} {} {} {} {}",
+            &data_hex[0..8],
+            &data_hex[8..16],
+            &data_hex[16..24],
+            &data_hex[24..40],
+            &data_hex[40..56],
+            &data_hex[56..64],
+            &data_hex[64..72],
+            &data_hex[72..80],
+            &data_hex[80..],
+        )
+    }
+}
+
+impl FocusAdjustDataPacket {
+    const fn create(transaction_id: u32, param1: u32, speed: FocusAdjustSpeed) -> Self {
+        FocusAdjustDataPacket {
+            length: 0x14,
+            packet_type: 0x09,
+            transaction_id,
+            data_length: 0x0a,
+            unknown1: 0x0000000C_00000016,
+            transaction_id2: transaction_id,
+            param1,
+            unknown2: 0x02,
+            speed: speed as u16,
+        }
+    }
+}
+
 pub struct Lumix {
     id: String,
     name: String,
@@ -229,12 +338,26 @@ struct Connection {
     event_socket: OwnedWriteHalf,
     event_task: tokio::task::JoinHandle<()>,
     curr_transaction_id: u32,
-    curr_dir: u16,
-    curr_speed: u16,
+    curr_dir: ZoomDirection,
+    curr_speed: ZoomSpeed,
 }
 
 impl Connection {
-    async fn transaction(
+    async fn transaction(&mut self, name: &str, cmd: CommandPacket) -> Result<(), Box<dyn Error>> {
+        println!("{}: Sending ({}) {}", name, cmd.transaction_id, cmd);
+        self.curr_transaction_id += 1;
+        let resp = self
+            .socket
+            .write_and_read_resp(&bincode::serialize(&cmd).unwrap())
+            .map_err(|e| -> Box<dyn Error> {
+                format!("{}: error sending command: {}", name, e).into()
+            })
+            .await?;
+        println!("{}: Received {}", name, hex::encode(resp));
+        Ok(())
+    }
+
+    async fn transaction_with_data(
         &mut self,
         name: &str,
         cmd: CommandPacket,
@@ -257,6 +380,10 @@ impl Connection {
                 println!("{}: Sending ({}) {}", name, data.transaction_id, data);
                 bincode::serialize(&data).unwrap()
             }
+            DataPacket::FocusAdjust(data) => {
+                println!("{}: Sending ({}) {}", name, data.transaction_id, data);
+                bincode::serialize(&data).unwrap()
+            }
         };
         let resp = self
             .socket
@@ -275,37 +402,78 @@ impl Connection {
         command: super::Command,
     ) -> Result<(), Box<dyn Error>> {
         println!("{}: Received command {:?}", name, command);
+
+        self.handle_focus(name, command).await?;
+
+        {}
+
+        self.handle_zoom(name, command).await?;
+        Ok(())
+    }
+
+    async fn handle_focus(
+        &mut self,
+        name: &str,
+        command: super::Command,
+    ) -> Result<(), Box<dyn Error>> {
+        if command.autofocus {
+            let af_cmd = CommandPacket::one_shot_af(self.curr_transaction_id);
+            self.transaction(name, af_cmd).await?;
+        }
+
+        let speed = match command.focus {
+            x if x < -0.75 => FocusAdjustSpeed::NearFast,
+            x if x < 0.0 => FocusAdjustSpeed::NearSlow,
+            x if x > 0.75 => FocusAdjustSpeed::FarFast,
+            x if x > 0.0 => FocusAdjustSpeed::FarSlow,
+            _ => FocusAdjustSpeed::Stop,
+        };
+        if speed == FocusAdjustSpeed::Stop {
+            return Ok(());
+        }
+
+        let focus_cmd = CommandPacket::adjust_focus(self.curr_transaction_id);
+        let focus_data =
+            FocusAdjustDataPacket::create(self.curr_transaction_id, focus_cmd.param1, speed);
+        self.transaction_with_data(name, focus_cmd, DataPacket::FocusAdjust(focus_data))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_zoom(
+        &mut self,
+        name: &str,
+        command: super::Command,
+    ) -> Result<(), Box<dyn Error>> {
         let dir = match command.zoom {
-            x if x < 0.0 => 0x00,
-            x if x > 0.0 => 0x01,
+            x if x < 0.0 => ZoomDirection::Wide,
+            x if x > 0.0 => ZoomDirection::Tele,
             _ => self.curr_dir,
         };
         let speed = match command.zoom {
-            x if x < -0.75 => 0x02,
-            x if x < 0.0 => 0x01,
-            x if x > 0.75 => 0x02,
-            x if x > 0.0 => 0x01,
-            _ => 0x00,
+            x if x < -0.75 => ZoomSpeed::High,
+            x if x < 0.0 => ZoomSpeed::Low,
+            x if x > 0.75 => ZoomSpeed::High,
+            x if x > 0.0 => ZoomSpeed::Low,
+            _ => ZoomSpeed::Off,
         };
         if (dir == self.curr_dir) && (speed == self.curr_speed) {
             return Ok(());
         }
-
-        if self.curr_speed != 0 {
+        if self.curr_speed != ZoomSpeed::Off {
             let stop_cmd = CommandPacket::stop_zoom(self.curr_transaction_id);
             let stop_data = ZoomStopDataPacket::create(self.curr_transaction_id, stop_cmd.param1);
-            self.transaction(name, stop_cmd, DataPacket::ZoomStop(stop_data))
+            self.transaction_with_data(name, stop_cmd, DataPacket::ZoomStop(stop_data))
                 .await?;
         }
-
-        if speed != 0 {
+        if speed != ZoomSpeed::Off {
             let start_cmd = CommandPacket::start_zoom(self.curr_transaction_id);
             let start_data =
                 ZoomStartDataPacket::create(self.curr_transaction_id, start_cmd.param1, dir, speed);
-            self.transaction(name, start_cmd, DataPacket::ZoomStart(start_data))
+            self.transaction_with_data(name, start_cmd, DataPacket::ZoomStart(start_data))
                 .await?;
         }
-
         self.curr_dir = dir;
         self.curr_speed = speed;
         Ok(())
@@ -411,8 +579,8 @@ impl super::Device for Lumix {
             event_socket: w,
             event_task,
             curr_transaction_id: 1,
-            curr_dir: 0,
-            curr_speed: 0,
+            curr_dir: ZoomDirection::Wide,
+            curr_speed: ZoomSpeed::Off,
         });
         println!("{}: Connected", self);
         Ok(())

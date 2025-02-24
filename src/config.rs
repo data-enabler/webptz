@@ -55,14 +55,17 @@ pub struct LancConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Mappings {
-    pub pan_l: Vec<PadInput>,
-    pub pan_r: Vec<PadInput>,
-    pub tilt_u: Vec<PadInput>,
-    pub tilt_d: Vec<PadInput>,
-    pub roll_l: Vec<PadInput>,
-    pub roll_r: Vec<PadInput>,
-    pub zoom_i: Vec<PadInput>,
-    pub zoom_o: Vec<PadInput>,
+    pub pan_l: Option<Vec<PadInput>>,
+    pub pan_r: Option<Vec<PadInput>>,
+    pub tilt_u: Option<Vec<PadInput>>,
+    pub tilt_d: Option<Vec<PadInput>>,
+    pub roll_l: Option<Vec<PadInput>>,
+    pub roll_r: Option<Vec<PadInput>>,
+    pub zoom_i: Option<Vec<PadInput>>,
+    pub zoom_o: Option<Vec<PadInput>>,
+    pub focus_f: Option<Vec<PadInput>>,
+    pub focus_n: Option<Vec<PadInput>>,
+    pub focus_a: Option<Vec<PadInput>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

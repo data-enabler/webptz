@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'htm/preact';
 
 /** @import { ControlState } from './state.js'; */
+import { ZERO_STATE } from './state.js';
 
 /**
  * @typedef {{
  *   groupId: string|null,
- *   type: 'pan-tilt'|'zoom',
+ *   type: 'pan-tilt'|'zoom'|'focus',
  *   origin: number[],
  *   currXY: number[],
  *   range: number,
@@ -37,7 +38,7 @@ export function useMouseControl() {
         return;
       }
       const target = /** @type {HTMLElement} */ (e.target);
-      if (!target.matches('.js-pt-joystick, .js-zoom-joystick')) {
+      if (!target.matches('.js-pt-joystick, .js-zoom-joystick, .js-focus-joystick')) {
         return;
       }
       e.preventDefault();
@@ -52,7 +53,7 @@ export function useMouseControl() {
       /** @type {MouseControl} */
       const control = {
         groupId,
-        type: target.matches('.js-zoom-joystick') ? 'zoom' : 'pan-tilt',
+        type: target.matches('.js-zoom-joystick') ? 'zoom' : (target.matches('.js-focus-joystick') ? 'focus' : 'pan-tilt'),
         origin,
         currXY: origin,
         range: (target.parentElement?.clientHeight || 0) / 2,
@@ -96,20 +97,17 @@ export function useMouseControl() {
 }
 /**
  * @param {MouseControl} c
+ * @param {ControlState} lastState
  * @return {ControlState}
  */
-export function mouseStateToControlState(c) {
+export function mouseStateToControlState(c, lastState) {
   if (c.range === 0) {
-    return {
-      pan: 0,
-      tilt: 0,
-      roll: 0,
-      zoom: 0,
-    };
+    return ZERO_STATE;
   }
   let pan = 0;
   let tilt = 0;
   let zoom = 0;
+  let focus = 0;
   if (c.type === 'pan-tilt') {
     const deltaX = c.currXY[0] - c.origin[0];
     const deltaY = -1 * (c.currXY[1] - c.origin[1]);
@@ -123,10 +121,16 @@ export function mouseStateToControlState(c) {
     const unclamped = -1 * (c.currXY[1] - c.origin[1]) / c.range;
     zoom = Math.min(Math.max(unclamped, -1), 1);
   }
+  if (c.type === 'focus') {
+    const unclamped = -1 * (c.currXY[1] - c.origin[1]) / c.range;
+    focus = Math.min(Math.max(unclamped, -1), 1);
+  }
   return {
     pan,
     tilt,
     roll: 0,
     zoom,
+    focus,
+    autofocus: lastState.autofocus,
   };
 }

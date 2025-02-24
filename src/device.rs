@@ -14,6 +14,8 @@ pub struct Command {
     pub tilt: f64,
     pub roll: f64,
     pub zoom: f64,
+    pub focus: f64,
+    pub autofocus: bool,
 }
 
 #[async_trait]
