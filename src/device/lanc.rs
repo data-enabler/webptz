@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    time::{Duration, Instant},
+    vec,
+};
 
 use async_trait::async_trait;
 use tokio::{
@@ -8,6 +11,14 @@ use tokio::{
 };
 use tokio_serial::SerialPortBuilderExt as _;
 
+// Other potentially useful commands:
+// 2835: Zoom Tele slow
+// 2837: Zoom Wide slow
+// 2845: Focus Far
+// 2847: Focus Near
+// 2853: Iris Close
+// 2855: Iris Open
+
 const INTERVAL: Duration = Duration::from_millis(200);
 
 pub struct Lanc {
@@ -16,8 +27,10 @@ pub struct Lanc {
     connection: Option<Connection>,
 }
 
+type LancCommand = [u8; 5];
+
 struct Connection {
-    communication_channel: UnboundedSender<[u8; 5]>,
+    communication_channel: UnboundedSender<[LancCommand; 2]>,
     #[allow(unused)]
     communication_thread: JoinHandle<()>,
 }
@@ -42,13 +55,14 @@ impl super::Device for Lanc {
             .parity(tokio_serial::Parity::None)
             .stop_bits(tokio_serial::StopBits::One)
             .open_native_async()?;
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<[u8; 5]>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<[LancCommand; 2]>();
         let communication_thread = tokio::spawn(async move {
             while let Some(data) = rx.recv().await {
                 println!(
-                    "{}: Writing command {:?}",
+                    "{}: Writing commands {:?} {:?}",
                     name,
-                    std::str::from_utf8(&data).unwrap(),
+                    std::str::from_utf8(&data[0]).unwrap(),
+                    std::str::from_utf8(&data[1]).unwrap(),
                 );
                 let mut buf = [0; 32];
                 let mut counter = 0;
@@ -68,7 +82,7 @@ impl super::Device for Lanc {
                         }
                     }
 
-                    if let Err(e) = stream.write_all(&data).await {
+                    if let Err(e) = stream.write_all(&data[counter % 2]).await {
                         eprintln!("{}: Failed to write to stream: {}", name, e);
                     }
                     counter += 1;
@@ -127,35 +141,58 @@ impl super::Device for Lanc {
         let connection = self.connection.as_mut().unwrap();
 
         println!("{}: Received command {:?}", name, command);
-        if command.zoom == 0.0 {
-            return Ok(());
+        let mut commands: Vec<LancCommand> = vec![];
+
+        if command.zoom != 0.0 {
+            commands.push(match command.zoom {
+                x if x >= 0.8 => *b"280E\n",
+                x if x >= 0.7 => *b"280C\n",
+                x if x >= 0.6 => *b"280A\n",
+                x if x >= 0.5 => *b"2808\n",
+                x if x >= 0.4 => *b"2806\n",
+                x if x >= 0.3 => *b"2804\n",
+                x if x >= 0.2 => *b"2802\n",
+                x if x >= 0.0 => *b"2800\n",
+                x if x <= -0.8 => *b"281E\n",
+                x if x <= -0.7 => *b"281C\n",
+                x if x <= -0.6 => *b"281A\n",
+                x if x <= -0.5 => *b"2818\n",
+                x if x <= -0.4 => *b"2816\n",
+                x if x <= -0.3 => *b"2814\n",
+                x if x <= -0.2 => *b"2812\n",
+                x if x <= -0.0 => *b"2810\n",
+                _ => *b"0000\n",
+            });
         }
 
-        // Other potentially useful commands:
-        // 2835: Zoom Tele slow
-        // 2837: Zoom Wide slow
-        // 2845: Focus Far
-        // 2847: Focus Near
-        let command = match command.zoom {
-            x if x >= 0.8 => b"280E\n",
-            x if x >= 0.7 => b"280C\n",
-            x if x >= 0.6 => b"280A\n",
-            x if x >= 0.5 => b"2808\n",
-            x if x >= 0.4 => b"2806\n",
-            x if x >= 0.3 => b"2804\n",
-            x if x >= 0.2 => b"2802\n",
-            x if x >= 0.0 => b"2800\n",
-            x if x <= -0.8 => b"281E\n",
-            x if x <= -0.7 => b"281C\n",
-            x if x <= -0.6 => b"281A\n",
-            x if x <= -0.5 => b"2818\n",
-            x if x <= -0.4 => b"2816\n",
-            x if x <= -0.3 => b"2814\n",
-            x if x <= -0.2 => b"2812\n",
-            x if x <= -0.0 => b"2810\n",
-            _ => b"0000\n",
-        };
-        connection.communication_channel.send(*command)?;
+        if command.autofocus {
+            commands.push(*b"2843\n");
+        } else if command.focus != 0.0 {
+            commands.push(match command.focus {
+                x if x >= 0.80 => *b"28EB\n",
+                x if x >= 0.65 => *b"28E9\n",
+                x if x >= 0.50 => *b"28E7\n",
+                x if x >= 0.35 => *b"28E5\n",
+                x if x >= 0.20 => *b"28E3\n",
+                x if x >= 0.00 => *b"28E1\n",
+                x if x <= -0.80 => *b"28FB\n",
+                x if x <= -0.65 => *b"28F9\n",
+                x if x <= -0.50 => *b"28F7\n",
+                x if x <= -0.35 => *b"28F5\n",
+                x if x <= -0.20 => *b"28F3\n",
+                x if x <= -0.00 => *b"28F1\n",
+                _ => *b"0000\n",
+            });
+        }
+
+        if !commands.is_empty() {
+            // We're always sending two commands just for convenience reasons
+            if commands.len() == 1 {
+                commands.push(*commands.first().unwrap());
+            }
+            let arr: [LancCommand; 2] = commands.try_into().unwrap();
+            connection.communication_channel.send(arr)?;
+        }
 
         Ok(())
     }
