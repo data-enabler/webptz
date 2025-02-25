@@ -2,12 +2,13 @@
 
 :root {
   --size: 200px;
-  --thumb-size: 24px;
+  --thumb-size: 28px;
   --tap-size: 44px;
   --pan: 0;
   --tilt: 0;
   --roll: 0;
   --zoom: 0;
+  --autofocus: 0;
 }
 
 body {
@@ -68,6 +69,7 @@ dialog > * {
 
 .control__device {
   padding: 0.3rem;
+  line-height: 1.4;
   border-bottom: 1px solid currentColor;
 }
 
@@ -79,6 +81,10 @@ button[disabled] {
   display: flex;
 
   flex-flow: row nowrap;
+  align-items: flex-end;
+}
+
+.control__pt, .control__zoom, .control__focus {
   overflow: hidden; /* Prevent oversized tap targets from scrolling page */
 }
 
@@ -172,13 +178,23 @@ button[disabled] {
   );
 }
 
+.control__zoom, .control__focus-container {
+  margin: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.control__focus-container {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .control__zoom, .control__focus {
   position: relative;
   width: var(--thumb-size);
   height: var(--size);
   box-sizing: border-box;
-  flex: 0 0 auto;
-  margin: 0.3rem;
 
   isolation: isolate;
 
@@ -219,4 +235,8 @@ button[disabled] {
     -50%,
     calc(50% + -0.5 * var(--focus) * calc(var(--size) - var(--thumb-size)))
   );
+}
+
+.control__focus-autofocus {
+  filter: invert(var(--autofocus));
 }

@@ -129,6 +129,31 @@ export function useMouseControl() {
         joystick.range = 0;
       }
     };
+
+    /**
+     * @param {MouseEvent} e
+     */
+    const onClick = function (e) {
+      const target = /** @type {HTMLElement} */ (e.target);
+      if (!target.matches('.js-button')) {
+        return;
+      }
+      const groupId = target.dataset.groupId;
+      const type = /** @type {(keyof MouseControl['buttons'])|undefined} */(target.dataset.type);
+      if (!groupId || !type) {
+        return;
+      }
+      console.log(groupId, type);
+      const buttons = getButtons(ref, groupId);
+      // Consider button pressed for enough time to guarantee a poll
+      buttons[type] = true;
+      console.log(JSON.stringify(ref.current[groupId].buttons));
+      setTimeout(() => {
+        buttons[type] = false;
+        console.log(JSON.stringify(ref.current[groupId].buttons));
+      }, 100);
+    };
+
     document.documentElement.addEventListener('mousedown', startDrag);
     document.documentElement.addEventListener('touchstart', startDrag, { passive: false });
     document.documentElement.addEventListener('mousemove', moveDrag);
@@ -137,6 +162,7 @@ export function useMouseControl() {
     document.documentElement.addEventListener('touchend', endDrag);
     document.documentElement.addEventListener('mouseleave', endDrag);
     document.documentElement.addEventListener('touchcancel', endDrag);
+    document.documentElement.addEventListener('click', onClick);
     return function cleanup() {
       document.documentElement.removeEventListener('mousedown', startDrag);
       document.documentElement.removeEventListener('touchstart', startDrag);
@@ -146,6 +172,7 @@ export function useMouseControl() {
       document.documentElement.removeEventListener('touchend', endDrag);
       document.documentElement.removeEventListener('mouseleave', endDrag);
       document.documentElement.removeEventListener('touchcancel', endDrag);
+      document.documentElement.removeEventListener('click', onClick);
     };
   }, []);
   return ref;
@@ -180,6 +207,16 @@ function getJoystick(ref, groupId, type) {
 }
 
 /**
+ * @param {{ current: MouseControls }} ref
+ * @param {string} groupId
+ * @returns {MouseControl['buttons']}
+ */
+function getButtons(ref, groupId) {
+  ref.current[groupId] = ref.current[groupId] || newMouseControl();
+  return ref.current[groupId].buttons;
+}
+
+/**
  * @returns {MouseControl}
  */
 function newMouseControl() {
@@ -197,14 +234,14 @@ function newMouseControl() {
 
 /**
  * @param {MouseControls} c
- * @param {ControlStates} lastStates
+ * @param {ControlStates} prevStates
  * @return {ControlStates}
  */
-export function mouseControlsToControlStates(c, lastStates) {
+export function mouseControlsToControlStates(c, prevStates) {
   /** @type {ControlStates} */
   const states = {};
   for (const [groupId, control] of Object.entries(c)) {
-    const lastState = lastStates[groupId] || ZERO_STATE;
+    const lastState = prevStates[groupId] || ZERO_STATE;
     const newState = mouseControlToControlState(control, lastState);
     states[groupId] = newState;
   }
@@ -213,20 +250,24 @@ export function mouseControlsToControlStates(c, lastStates) {
 
 /**
  * @param {MouseControl} c
- * @param {ControlState} lastState
+ * @param {ControlState} prevState
  * @return {ControlState}
  */
-export function mouseControlToControlState(c, lastState) {
+export function mouseControlToControlState(c, prevState) {
   const [pan, tilt] = getAxes(c.joysticks.panTilt);
   const zoom = getAxis(c.joysticks.zoom);
   const focus = getAxis(c.joysticks.focus);
+  const autofocus = {
+    pressed: c.buttons.autofocus,
+    active: prevState.autofocus.active || (c.buttons.autofocus && !prevState.autofocus.pressed),
+  };
   return {
     pan,
     tilt,
     roll: 0,
     zoom,
     focus,
-    autofocus: lastState.autofocus,
+    autofocus,
   };
 }
 
