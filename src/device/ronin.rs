@@ -8,11 +8,14 @@ use btleplug::{
 };
 use futures::{StreamExt, TryFutureExt as _};
 use std::{
+    collections::HashSet,
     error::Error,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tokio::{sync::watch, time::timeout};
+
+use crate::config::{self, all_capabilities, Capability};
 
 #[allow(unused)]
 pub const SERVICE_UUID: uuid::Uuid = uuid_from_u16(0xfff0);
@@ -95,6 +98,7 @@ pub struct Ronin {
     next_seq: watch::Sender<u16>,
     adapter: Adapter,
     connection: Option<Connection>,
+    capabilities: HashSet<Capability>,
 }
 
 struct Connection {
@@ -214,16 +218,17 @@ impl super::Device for Ronin {
                 println!("{}: Not connected", name);
             }
             Some(ref mut c) => {
-                let ptr_unchanged =
-                    command.pan == 0.0 && command.tilt == 0.0 && command.roll == 0.0;
-                let zoom_unchanged = command.zoom == 0.0 && *c.zoom_speed.borrow() == 0.0;
-                if ptr_unchanged && zoom_unchanged {
+                let send_ptr = self.capabilities.contains(&Capability::Ptr)
+                    && (command.pan != 0.0 || command.tilt != 0.0 || command.roll != 0.0);
+                let send_zoom = self.capabilities.contains(&Capability::Zoom)
+                    && (command.zoom != 0.0 || *c.zoom_speed.borrow() != 0.0);
+                if !send_ptr && !send_zoom {
                     return Ok(());
                 }
 
                 c.try_resume_connection(&name).await?;
 
-                if !ptr_unchanged {
+                if send_ptr {
                     let content = create_packet(
                         get_seq(&self.next_seq),
                         command.pan,
@@ -239,7 +244,7 @@ impl super::Device for Ronin {
                     println!(" ...sent");
                 }
 
-                if !zoom_unchanged {
+                if send_zoom {
                     c.zoom_speed.send_replace(command.zoom);
                 }
             }
@@ -372,14 +377,19 @@ fn create_zoom_task(
     })
 }
 
-pub fn create(id: &str, adapter: Adapter, name: &str) -> Ronin {
+pub fn create(id: &str, adapter: Adapter, config: &config::RoninConfig) -> Ronin {
     let (next_seq, _) = watch::channel(0);
     Ronin {
         id: id.to_owned(),
-        name: name.to_owned(),
+        name: config.name.to_owned(),
         next_seq,
         adapter,
         connection: None,
+        capabilities: config
+            .capabilities
+            .clone()
+            .map(HashSet::from_iter)
+            .unwrap_or_else(all_capabilities),
     }
 }
 

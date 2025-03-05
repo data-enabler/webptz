@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     time::{Duration, Instant},
     vec,
 };
@@ -10,6 +11,8 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_serial::SerialPortBuilderExt as _;
+
+use crate::config::{self, all_capabilities, Capability};
 
 // Other potentially useful commands:
 // 2835: Zoom Tele slow
@@ -25,6 +28,7 @@ pub struct Lanc {
     id: String,
     port: String,
     connection: Option<Connection>,
+    capabilities: HashSet<Capability>,
 }
 
 type LancCommand = [u8; 5];
@@ -143,7 +147,7 @@ impl super::Device for Lanc {
         println!("{}: Received command {:?}", name, command);
         let mut commands: Vec<LancCommand> = vec![];
 
-        if command.zoom != 0.0 {
+        if self.capabilities.contains(&Capability::Zoom) && command.zoom != 0.0 {
             commands.push(match command.zoom {
                 x if x >= 0.8 => *b"280E\n",
                 x if x >= 0.7 => *b"280C\n",
@@ -165,9 +169,9 @@ impl super::Device for Lanc {
             });
         }
 
-        if command.autofocus {
+        if self.capabilities.contains(&Capability::Autofocus) && command.autofocus {
             commands.push(*b"2843\n");
-        } else if command.focus != 0.0 {
+        } else if self.capabilities.contains(&Capability::Focus) && command.focus != 0.0 {
             commands.push(match command.focus {
                 x if x >= 0.80 => *b"28EB\n",
                 x if x >= 0.65 => *b"28E9\n",
@@ -198,10 +202,15 @@ impl super::Device for Lanc {
     }
 }
 
-pub fn create(id: &str, port: &str) -> Lanc {
+pub fn create(id: &str, config: &config::LancConfig) -> Lanc {
     Lanc {
         id: id.to_string(),
-        port: port.to_string(),
+        port: config.port.to_string(),
         connection: None,
+        capabilities: config
+            .capabilities
+            .clone()
+            .map(HashSet::from_iter)
+            .unwrap_or_else(all_capabilities),
     }
 }

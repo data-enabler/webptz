@@ -27,21 +27,33 @@ pub enum DeviceConfig {
     Lanc(LancConfig),
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum Capability {
+    Ptr,
+    Zoom,
+    Focus,
+    Autofocus,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DummyConfig {
+    pub capabilities: Option<Vec<Capability>>,
     pub name: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RoninConfig {
+    pub capabilities: Option<Vec<Capability>>,
     pub name: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LumixConfig {
+    pub capabilities: Option<Vec<Capability>>,
     pub address: String,
     pub password: Option<String>,
 }
@@ -49,6 +61,7 @@ pub struct LumixConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LancConfig {
+    pub capabilities: Option<Vec<Capability>>,
     pub port: String,
 }
 
@@ -76,6 +89,15 @@ pub struct PadInput {
     pub input_type: String,
     pub input_index: usize,
     pub multiplier: f32,
+}
+
+pub fn all_capabilities() -> HashSet<Capability> {
+    HashSet::from([
+        Capability::Ptr,
+        Capability::Zoom,
+        Capability::Focus,
+        Capability::Autofocus,
+    ])
 }
 
 pub async fn load_config() -> Result<Config, Box<dyn Error>> {
@@ -171,12 +193,14 @@ fn test_detect_undefined_devices() {
             (
                 "device1".to_string(),
                 DeviceConfig::Dummy(DummyConfig {
+                    capabilities: None,
                     name: "dummy".to_string(),
                 }),
             ),
             (
                 "device3".to_string(),
                 DeviceConfig::Dummy(DummyConfig {
+                    capabilities: None,
                     name: "dummy".to_string(),
                 }),
             ),

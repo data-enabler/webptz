@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, time::Duration};
+use std::{collections::HashSet, error::Error, fmt::Display, time::Duration};
 
 use async_trait::async_trait;
 use futures::TryFutureExt;
@@ -9,6 +9,8 @@ use tokio::{
     net::{tcp::OwnedWriteHalf, TcpStream},
     time::timeout,
 };
+
+use crate::config::{self, all_capabilities, Capability};
 
 const APP_UUID: &str = "52D5842E-90C6-4846-9665-C238229D22E9";
 const APP_NAME: &str = "LUMIXTether";
@@ -331,6 +333,7 @@ pub struct Lumix {
     address: String,
     password: Option<String>,
     connection: Option<Connection>,
+    capabilities: HashSet<Capability>,
 }
 
 struct Connection {
@@ -396,22 +399,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn send_command_internal(
-        &mut self,
-        name: &str,
-        command: super::Command,
-    ) -> Result<(), Box<dyn Error>> {
-        println!("{}: Received command {:?}", name, command);
-
-        self.handle_focus(name, command).await?;
-
-        {}
-
-        self.handle_zoom(name, command).await?;
-        Ok(())
-    }
-
-    async fn handle_focus(
+    async fn handle_autofocus(
         &mut self,
         name: &str,
         command: super::Command,
@@ -420,7 +408,14 @@ impl Connection {
             let af_cmd = CommandPacket::one_shot_af(self.curr_transaction_id);
             self.transaction(name, af_cmd).await?;
         }
+        Ok(())
+    }
 
+    async fn handle_focus(
+        &mut self,
+        name: &str,
+        command: super::Command,
+    ) -> Result<(), Box<dyn Error>> {
         let speed = match command.focus {
             x if x < -0.75 => FocusAdjustSpeed::NearFast,
             x if x < 0.0 => FocusAdjustSpeed::NearSlow,
@@ -621,20 +616,37 @@ impl super::Device for Lumix {
                 println!("{}: Not connected", name);
             }
             Some(ref mut c) => {
-                c.send_command_internal(&name, command).await?;
+                println!("{}: Received command {:?}", name, command);
+
+                if self.capabilities.contains(&Capability::Autofocus) {
+                    c.handle_autofocus(&name, command).await?;
+                }
+
+                if self.capabilities.contains(&Capability::Focus) {
+                    c.handle_focus(&name, command).await?;
+                }
+
+                if self.capabilities.contains(&Capability::Zoom) {
+                    c.handle_zoom(&name, command).await?;
+                }
             }
         }
         Ok(())
     }
 }
 
-pub fn create(id: &str, address: &str, password: Option<String>) -> Lumix {
+pub fn create(id: &str, config: &config::LumixConfig) -> Lumix {
     Lumix {
         id: id.to_owned(),
-        name: address.to_owned(),
-        address: address.to_owned(),
-        password,
+        name: config.address.to_owned(),
+        address: config.address.to_owned(),
+        password: config.password.to_owned(),
         connection: None,
+        capabilities: config
+            .capabilities
+            .clone()
+            .map(HashSet::from_iter)
+            .unwrap_or_else(all_capabilities),
     }
 }
 

@@ -88,19 +88,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Box::new(dummy)
                 }
                 config::DeviceConfig::Ronin(ronin_config) => {
-                    let ronin = device::ronin::create(id, central.clone(), &ronin_config.name);
+                    let ronin = device::ronin::create(id, central.clone(), ronin_config);
                     Box::new(ronin)
                 }
                 config::DeviceConfig::Lumix(lumix_config) => {
-                    let lumix = device::lumix::create(
-                        id,
-                        &lumix_config.address.clone(),
-                        lumix_config.password.clone(),
-                    );
+                    let lumix = device::lumix::create(id, lumix_config);
                     Box::new(lumix)
                 }
                 config::DeviceConfig::Lanc(lanc_config) => {
-                    let lanc = device::lanc::create(id, &lanc_config.port);
+                    let lanc = device::lanc::create(id, lanc_config);
                     Box::new(lanc)
                 }
             };
