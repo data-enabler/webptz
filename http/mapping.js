@@ -156,9 +156,9 @@ export function readInput(pads, input) {
   }
   switch (input.type) {
     case 'button':
-      return ignoreDeadzone(Math.max(0, pad.buttons[input.inputIndex].value * input.multiplier));
+      return Math.max(0, ignoreDeadzone(pad.buttons[input.inputIndex].value) * input.multiplier);
     case 'axis':
-      return ignoreDeadzone(Math.max(0, pad.axes[input.inputIndex] * input.multiplier));
+      return Math.max(0, ignoreDeadzone(pad.axes[input.inputIndex]) * input.multiplier);
   }
 }
 
