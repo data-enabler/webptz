@@ -80,20 +80,6 @@ function App() {
           <h2 class="control__name">${groupId}</h2>
           ${buttonMapper}
         </header>
-        <div>
-          ${devices.map((id) => {
-            const d = state.devices[id];
-            return html`
-              <div class="control__device">
-                ${d.name}
-                <br/>
-                <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
-                ${' '}
-                <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
-              </div>
-            `;
-          })}
-        </div>
         <div class="control__controls">
           <div class="control__pt">
             <div class="control__pt-bg"></div>
@@ -108,6 +94,20 @@ function App() {
               <div class="control__focus-joystick js-joystick" data-group-id=${groupId} data-type="focus"></div>
             </div>
           </div>
+        </div>
+        <div>
+          ${devices.map((id) => {
+            const d = state.devices[id];
+            return html`
+              <div class="control__device">
+                ${d.name}
+                <br/>
+                <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
+                ${' '}
+                <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
+              </div>
+            `;
+          })}
         </div>
       </div>
     `;
