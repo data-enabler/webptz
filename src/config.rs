@@ -105,7 +105,8 @@ pub async fn load_config() -> Result<Config, Box<dyn Error>> {
     let config_path = match args.get(1) {
         Some(path) => path,
         None => {
-            return Err("no config path provided".into());
+            println!("No config path provided, defaulting to config.json");
+            "config.json"
         }
     };
     let content = tokio::fs::read_to_string(config_path).await?;
