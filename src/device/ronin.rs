@@ -37,6 +37,7 @@ const ZOOM_MAX: u16 = 4095;
 const ZOOM_ENDPOINT_TOLERANCE: u16 = 20;
 const ZOOM_SPEED_MIN: f64 = 3.0;
 const ZOOM_SPEED_MAX: f64 = 1000.0;
+const ZOOM_MIN_INITIAL_INCREMENT: i32 = 15;
 
 fn add_checksum(b: &[u8]) -> Vec<u8> {
     let checksum = CRC.checksum(b).to_le_bytes();
@@ -331,11 +332,13 @@ fn create_zoom_task(
                 let increment = scale_zoom_value(speed);
                 let curr_zoom = *current_zoom_rx.borrow();
                 if prev_speed == 0.0 || prev_speed.is_sign_positive() != speed.is_sign_positive() {
+                    let initial_increment =
+                        increment.signum() * increment.abs().max(ZOOM_MIN_INITIAL_INCREMENT);
                     println!(
-                        "{}: Starting zoom. Step: {}, Current zoom level: {}",
-                        name, increment, curr_zoom
+                        "{}: Starting zoom. Step: {}, Initial step: {}, Current zoom level: {}",
+                        name, increment, initial_increment, curr_zoom
                     );
-                    target_zoom = curr_zoom as i32 + increment;
+                    target_zoom = curr_zoom as i32 + initial_increment;
                 } else if zoom_movement_rx.borrow().elapsed() < Duration::from_millis(200) {
                     target_zoom += increment;
                 }
