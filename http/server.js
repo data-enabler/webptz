@@ -84,7 +84,10 @@ export function useServer() {
   }));
   const ws = useRef(/** @type {WebSocket|null} */(null));
   useEffect(() => {
-    const websocket = new ReconnectingWebSocket("/control", [], {
+    const url = new URL(window.location.href);
+    url.protocol = "ws";
+    url.pathname = "/control";
+    const websocket = new ReconnectingWebSocket(url.href, [], {
       minReconnectionDelay: 500,
       maxReconnectionDelay: 8000,
       reconnectionDelayGrowFactor: 2,
