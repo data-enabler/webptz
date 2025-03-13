@@ -55,8 +55,8 @@ export function normalizeGamepad(pad) {
   if (pad == null) {
     return null;
   }
-  // DualSense controllers don't have a standard mapping available
-  if (pad.id.includes('DualSense')) {
+  // DualSense controllers don't have a standard mapping available in all browsers
+  if (pad.id.includes('DualSense') && pad.mapping != 'standard') {
     const {axes: origAxes, buttons: origButtons} = pad;
 
     // DualSense triggers are cursed; they have a value of 0.0 until you first
