@@ -154,11 +154,13 @@ export function readInput(pads, input) {
   if (pad == null) {
     return 0;
   }
+  const button = /** @type {GamepadButton|undefined} */(pad.buttons[input.inputIndex]);
+  const axis = /** @type {number|undefined} */(pad.axes[input.inputIndex]);
   switch (input.type) {
     case 'button':
-      return Math.max(0, ignoreDeadzone(pad.buttons[input.inputIndex].value) * input.multiplier);
+      return Math.max(0, ignoreDeadzone(button?.value ?? 0) * input.multiplier);
     case 'axis':
-      return Math.max(0, ignoreDeadzone(pad.axes[input.inputIndex]) * input.multiplier);
+      return Math.max(0, ignoreDeadzone(axis ?? 0) * input.multiplier);
   }
 }
 
