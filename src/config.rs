@@ -120,9 +120,7 @@ pub async fn save_config(config: &Config) -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let config_path = match args.get(1) {
         Some(path) => path,
-        None => {
-            return Err("no config path provided".into());
-        }
+        None => "config.json",
     };
     let content = serde_json::to_string_pretty(config)?;
     tokio::fs::write(config_path, content).await?;
