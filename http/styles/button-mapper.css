@@ -27,12 +27,17 @@
 
 .mapper-group__heading {
   margin: 0 0 1rem;
-  font-size: 2em;
   border-bottom: 1px solid currentColor;
 }
 
+.mapper-group__heading h3 {
+  display: inline;
+  font-size: 2em;
+}
+
 .mapper-group__heading button {
-  vertical-align: middle;
+  /* Account for border, padding, and descenders */
+  vertical-align: calc(3px + 0.2lh);
 }
 
 .mapper-group__inputs {

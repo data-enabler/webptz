@@ -1,0 +1,24 @@
+.settings__trigger {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  margin: 0.5rem;
+
+  font-size: 1.25rem;
+}
+
+.settings__container {
+  padding: 0.5rem 1rem;
+}
+
+.settings__heading {
+  margin: 0 0 0.5rem;
+}
+
+.settings__section {
+  margin-bottom: 0.5rem;
+}
+
+.settings__actions {
+  text-align: right;
+}

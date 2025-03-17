@@ -1,0 +1,47 @@
+html {
+  font-size: 1rem;
+}
+
+body {
+  margin: 0.5rem;
+
+  color: var(--color-fg);
+  background-color: var(--color-bg);
+  font-family: serif;
+}
+
+button {
+  font-family: sans-serif;
+  font-size: 0.833em;
+}
+
+dialog {
+  max-width: calc(100% - 32px);
+  max-height: 100%;
+  box-sizing: border-box;
+
+  padding: 0;
+
+  color: var(--color-fg);
+  background-color: var(--color-bg);
+  border: 2px solid currentColor;
+}
+
+dialog > * {
+  /**
+   * Dialog elements appear to be busted in Firefox, at least, and sizing based
+   * on the parent doesn't work.
+   */
+  min-height: 0;
+  max-height: calc(100% - 4px);
+  box-sizing: border-box;
+}
+
+::backdrop {
+  background-color: #00000088;
+}
+
+input[type="range"] {
+  /* Make tick marks visible */
+  color: currentColor;
+}

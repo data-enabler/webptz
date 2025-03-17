@@ -4,7 +4,9 @@ import { ButtonMapper } from './button-mapper.js';
 import { useGamepadPoll } from './controls.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
+/** @import { ServerState } from './server.js'; */
 import { unmapDefaultControls, useServer } from './server.js';
+import { Settings } from './settings.js';
 /** @import { ControlStates } from './state.js'; */
 import { ZERO_STATE } from './state.js';
 
@@ -62,56 +64,84 @@ function App() {
       setDefaultMappings=${setDefaultMappings}
     />
   `;
-  return state.groups.map(({ name: groupId, devices }) => {
-    const s = controlStates[groupId] || ZERO_STATE;
-    return html`
-      <div class="control js-control"
-        data-group-id=${groupId}
-        style=${{
-          '--pan': s.pan,
-          '--tilt': s.tilt,
-          '--roll': s.roll,
-          '--zoom': s.zoom,
-          '--focus': s.focus,
-          '--autofocus': s.autofocus.pressed ? 1 : 0,
-        }}
-      >
-        <header class="control__header">
-          <h2 class="control__name">${groupId}</h2>
-          ${buttonMapper}
-        </header>
-        <div class="control__controls">
-          <div class="control__pt">
-            <div class="control__pt-bg"></div>
-            <div class="control__pt-joystick js-joystick" data-group-id=${groupId} data-type="panTilt"></div>
-          </div>
-          <div class="control__zoom">
-            <div class="control__zoom-joystick js-joystick" data-group-id=${groupId} data-type="zoom"></div>
-          </div>
-          <div class="control__focus-container">
-            <button type="button" class="control__focus-autofocus js-button" data-group-id=${groupId} data-type="autofocus" title="1-Shot Auto-Focus">AF</button>
-            <div class="control__focus">
-              <div class="control__focus-joystick js-joystick" data-group-id=${groupId} data-type="focus"></div>
-            </div>
-          </div>
+  return html`
+    <div class="control__container">
+      ${state.groups.map(({ name, devices }) => html`
+        <${Control}
+          state=${state}
+          groupId=${name}
+          deviceIds=${devices}
+          controlStates=${controlStates}
+          onDisconnect=${onDisconnect}
+          onReconnect=${onReconnect}
+          buttonMapper=${buttonMapper}
+        />
+      `)}
+    </div>
+    <${Settings} />
+  `;
+}
+
+/**
+ * @param {{
+ *   state: ServerState,
+ *   groupId: string,
+ *   deviceIds: string[],
+ *   controlStates: ControlStates,
+ *   onDisconnect: function(string): void,
+ *   onReconnect: function(string): void,
+ *   buttonMapper: import('react').ReactNode,
+ * }} props
+ */
+function Control({state, groupId, deviceIds, controlStates, onDisconnect, onReconnect, buttonMapper}) {
+  const s = controlStates[groupId] || ZERO_STATE;
+  return html`
+    <div class="control js-control"
+      data-group-id=${groupId}
+      style=${{
+      '--pan': s.pan,
+      '--tilt': s.tilt,
+      '--roll': s.roll,
+      '--zoom': s.zoom,
+      '--focus': s.focus,
+      '--autofocus': s.autofocus.pressed ? 1 : 0,
+    }}
+    >
+      <header class="control__header">
+        <h2 class="control__name">${groupId}</h2>
+        ${buttonMapper}
+      </header>
+      <div class="control__controls">
+        <div class="control__pt">
+          <div class="control__pt-bg"></div>
+          <div class="control__pt-joystick js-joystick" data-group-id=${groupId} data-type="panTilt"></div>
         </div>
-        <div>
-          ${devices.map((id) => {
-            const d = state.devices[id];
-            return html`
-              <div class="control__device">
-                ${d.name}
-                <br/>
-                <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
-                ${' '}
-                <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
-              </div>
-            `;
-          })}
+        <div class="control__zoom">
+          <div class="control__zoom-joystick js-joystick" data-group-id=${groupId} data-type="zoom"></div>
+        </div>
+        <div class="control__focus-container">
+          <button type="button" class="control__focus-autofocus js-button" data-group-id=${groupId} data-type="autofocus" title="1-Shot Auto-Focus">AF</button>
+          <div class="control__focus">
+            <div class="control__focus-joystick js-joystick" data-group-id=${groupId} data-type="focus"></div>
+          </div>
         </div>
       </div>
-    `;
-  });
+      <div>
+        ${deviceIds.map((id) => {
+          const d = state.devices[id];
+          return html`
+            <div class="control__device">
+              ${d.name}
+              <br/>
+              <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
+              ${' '}
+              <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
+            </div>
+          `;
+        })}
+      </div>
+    </div>
+  `;
 }
 
 render(html`

@@ -1,0 +1,12 @@
+:root, :root[data-theme="light"] {
+  --color-fg: black;
+  --color-bg: white;
+}
+
+/* set alternate colors for dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-fg: #dedcd9;
+    --color-bg: #222425;
+  }
+}

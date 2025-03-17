@@ -197,13 +197,13 @@ function MapperGroup({
 
   return html`
     <div class="mapper-group" tabindex="-1" autofocus=${autofocus}>
-      <h3 class="mapper-group__heading">
-        ${name}
+      <header class="mapper-group__heading">
+        <h3>${name}</h3>
         ${' '}
         <button type="button" onClick=${clear}>Clear</button>
         ${' '}
         <button type="button" onClick=${reset}>Reset to Default</button>
-      </h3>
+      </header>
       <div className="mapper-group__inputs">
         ${mappedInputs('panL')}
         <div>
