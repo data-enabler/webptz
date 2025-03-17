@@ -78,10 +78,16 @@ export function useMouseControl() {
         // origin so that the joystick doesn't snap back to the center
         const prevXOffset = -1 * joystick.currXY[0] + joystick.origin[0];
         const prevYOffset = -1 * joystick.currXY[1] + joystick.origin[1];
+        const joystickDims = target.getBoundingClientRect();
+        const joystickSize = Math.max(joystickDims.width, joystickDims.height);
+        const containerDims = target.parentElement
+          ? target.parentElement.getBoundingClientRect()
+          : { width: 0, height: 0 };
+        const containerSize = Math.max(containerDims.width, containerDims.height);
         joystick.touchId = touch.identifier;
         joystick.origin = [currXY[0] + prevXOffset, currXY[1] + prevYOffset];
         joystick.currXY = currXY;
-        joystick.range = (target.parentElement?.clientHeight || 0) / 2;
+        joystick.range = (containerSize - joystickSize) / 2;
       }
     };
 
@@ -147,10 +153,8 @@ export function useMouseControl() {
       const buttons = getButtons(ref, groupId);
       // Consider button pressed for enough time to guarantee a poll
       buttons[type] = true;
-      console.log(JSON.stringify(ref.current[groupId].buttons));
       setTimeout(() => {
         buttons[type] = false;
-        console.log(JSON.stringify(ref.current[groupId].buttons));
       }, 100);
     };
 
