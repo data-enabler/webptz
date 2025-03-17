@@ -46,8 +46,18 @@ export function ButtonMapper({
       }
       setDialogOpen(false);
     }
+    /** @param {MouseEvent} e */
+    function handleClickOutside(e) {
+      if (e.target === dialogRef.current) {
+        closeDialog();
+      }
+    }
     dialogRef.current.addEventListener('close', closeDialog);
-    return () => dialogRef.current?.removeEventListener('close', closeDialog);
+    dialogRef.current.addEventListener('click', handleClickOutside);
+    return () => {
+      dialogRef.current?.removeEventListener('close', closeDialog);
+      dialogRef.current?.removeEventListener('click', handleClickOutside);
+    };
   }, [setMappings, newMappings, setDialogOpen])
 
   const [target, setTarget] = useState(/** @type {[string, keyof Mapping]|null} */ (null));

@@ -24,8 +24,18 @@ export function Settings() {
     function closeDialog() {
       setDialogOpen(false);
     }
+    /** @param {MouseEvent} e */
+    function handleClickOutside(e) {
+      if (e.target === dialogRef.current) {
+        closeDialog();
+      }
+    }
     dialogRef.current.addEventListener('close', closeDialog);
-    return () => dialogRef.current?.removeEventListener('close', closeDialog);
+    dialogRef.current.addEventListener('click', handleClickOutside);
+    return () => {
+      dialogRef.current?.removeEventListener('close', closeDialog);
+      dialogRef.current?.removeEventListener('click', handleClickOutside);
+    };
   }, [setDialogOpen])
 
   function openDialog() {

@@ -25,6 +25,7 @@ dialog {
   color: var(--color-fg);
   background-color: var(--color-bg);
   border: 2px solid currentColor;
+  overscroll-behavior: contain;
 }
 
 dialog > * {
