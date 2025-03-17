@@ -158,3 +158,118 @@ export function mapDefaultControls(groups, defaultControls) {
 export function unmapDefaultControls(groups, controls) {
   return groups.map((group) => controls[group.name] || EMPTY_MAPPING);
 }
+
+/**
+ * @param {ServerState|undefined} initialState
+ * @return {{
+ *   state: ServerState,
+ *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage|SaveDefaultControlsMessage): void,
+ * }}
+ */
+export function useMockServer(initialState=DEFAULT_STATE) {
+  const [state, setState] = useState(initialState);
+  return {
+    state,
+    send: command => {
+      if ('disconnect' in command) {
+        setState((state) => ({
+          ...state,
+          devices: {
+            ...state.devices,
+            ...Object.fromEntries(command.disconnect.devices.map(id => [id, {
+              ...state.devices[id],
+              connected: false,
+            }]))
+          }
+        }));
+      }
+      if ('reconnect' in command) {
+        setState((state) => ({
+          ...state,
+          devices: {
+            ...state.devices,
+            ...Object.fromEntries(command.reconnect.devices.map(id => [id, {
+              ...state.devices[id],
+              connected: true,
+            }]))
+          }
+        }));
+      }
+    }
+  };
+}
+
+/** @type {ServerState} */
+export const DEFAULT_STATE = {
+  instance: 'mock',
+  groups: [
+    {
+      name: 'Cam 1',
+      devices: ['ronin1', 'lumix1', 'lanc1'],
+    },
+    {
+      name: 'Cam 2',
+      devices: ['ronin2', 'lumix2', 'lanc2'],
+    },
+  ],
+  devices: {
+    ronin1: {
+      id: 'ronin1',
+      name: 'Ronin[DJI RSC 2]',
+      connected: true,
+    },
+    ronin2: {
+      id: 'ronin2',
+      name: 'Ronin[DJI RS 3]',
+      connected: true,
+    },
+    lumix1: {
+      id: 'lumix1',
+      name: 'Lumix[DC-BGH1]',
+      connected: true,
+    },
+    lumix2: {
+      id: 'lumix2',
+      name: 'Lumix[DC-BS1H]',
+      connected: true,
+    },
+    lanc1: {
+      id: 'lanc1',
+      name: 'LANC[COM1]',
+      connected: true,
+    },
+    lanc2: {
+      id: 'lanc2',
+      name: 'LANC[COM2]',
+      connected: true,
+    },
+  },
+  defaultControls: {
+    'Cam 1': {
+      panL: [{padIndex: 0, type: 'axis', inputIndex: 0, multiplier: -1.0}],
+      panR: [{padIndex: 0, type: 'axis', inputIndex: 0, multiplier: 1.0}],
+      tiltU: [{padIndex: 0, type: 'axis', inputIndex: 1, multiplier: -1.0}],
+      tiltD: [{padIndex: 0, type: 'axis', inputIndex: 1, multiplier: 1.0}],
+      rollL: [{padIndex: 0, type: 'button', inputIndex: 14, multiplier: 1.0}],
+      rollR: [{padIndex: 0, type: 'button', inputIndex: 15, multiplier: 1.0}],
+      zoomI: [{padIndex: 0, type: 'button', inputIndex: 6, multiplier: 1.0}],
+      zoomO: [{padIndex: 0, type: 'button', inputIndex: 4, multiplier: 1.0}],
+      focusF: [{padIndex: 0, type: 'button', inputIndex: 12, multiplier: 1.0}],
+      focusN: [{padIndex: 0, type: 'button', inputIndex: 13, multiplier: 1.0}],
+      focusA: [{padIndex: 0, type: 'button', inputIndex: 10, multiplier: 1.0}],
+    },
+    'Cam 2': {
+      panL: [{padIndex: 0, type: 'axis', inputIndex: 2, multiplier: -1.0}],
+      panR: [{padIndex: 0, type: 'axis', inputIndex: 2, multiplier: 1.0}],
+      tiltU: [{padIndex: 0, type: 'axis', inputIndex: 3, multiplier: -1.0}],
+      tiltD: [{padIndex: 0, type: 'axis', inputIndex: 3, multiplier: 1.0}],
+      rollL: [{padIndex: 0, type: 'button', inputIndex: 2, multiplier: 1.0}],
+      rollR: [{padIndex: 0, type: 'button', inputIndex: 1, multiplier: 1.0}],
+      zoomI: [{padIndex: 0, type: 'button', inputIndex: 7, multiplier: 1.0}],
+      zoomO: [{padIndex: 0, type: 'button', inputIndex: 5, multiplier: 1.0}],
+      focusF: [{padIndex: 0, type: 'button', inputIndex: 3, multiplier: 1.0}],
+      focusN: [{padIndex: 0, type: 'button', inputIndex: 0, multiplier: 1.0}],
+      focusA: [{padIndex: 0, type: 'button', inputIndex: 11, multiplier: 1.0}],
+    },
+  },
+};

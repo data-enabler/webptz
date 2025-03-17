@@ -5,13 +5,20 @@ import { useGamepadPoll } from './controls.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
 /** @import { ServerState } from './server.js'; */
-import { unmapDefaultControls, useServer } from './server.js';
+import { DEFAULT_STATE, unmapDefaultControls, useMockServer, useServer } from './server.js';
 import { Settings } from './settings.js';
 /** @import { ControlStates } from './state.js'; */
 import { ZERO_STATE } from './state.js';
 
-function App() {
-  const { state, send } = useServer();
+/**
+ * @param {{
+ *   mock: ServerState|undefined,
+ * }} props
+ */
+function App({mock}) {
+  const remoteState = useServer();
+  const mockState = useMockServer(mock);
+  const { state, send } = mock ? mockState : remoteState;
   const [controlStates, setControlStates] = useState(/** @type {ControlStates} */ (
     Object.fromEntries(state.groups.map((g) => [g.name, ZERO_STATE]))
   ));
@@ -144,8 +151,25 @@ function Control({state, groupId, deviceIds, controlStates, onDisconnect, onReco
   `;
 }
 
+/**
+ * @returns {ServerState|undefined}
+ */
+function parseMockData() {
+  const params = new URLSearchParams(window.location.search);
+  const mockParam = params.get('mock');
+  if (mockParam === null) {
+    return undefined;
+  }
+  if (mockParam === '') {
+    return DEFAULT_STATE;
+  }
+  return JSON.parse(mockParam);
+}
+
 render(html`
-  <${App} />
+  <${App}
+    mock=${parseMockData()}
+  />
 `, document.body);
 
 window.addEventListener('gamepadconnected', (e) => {
