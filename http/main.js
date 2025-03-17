@@ -74,7 +74,7 @@ function App({mock}) {
   return html`
     <div class="control__container">
       ${state.groups.map(({ name, devices }) => html`
-        <${Control}
+        <${DeviceGroup}
           state=${state}
           groupId=${name}
           deviceIds=${devices}
@@ -100,7 +100,7 @@ function App({mock}) {
  *   buttonMapper: import('react').ReactNode,
  * }} props
  */
-function Control({state, groupId, deviceIds, controlStates, onDisconnect, onReconnect, buttonMapper}) {
+function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, onReconnect, buttonMapper}) {
   const s = controlStates[groupId] || ZERO_STATE;
   return html`
     <div class="control js-control"
@@ -127,7 +127,16 @@ function Control({state, groupId, deviceIds, controlStates, onDisconnect, onReco
           <div class="control__zoom-joystick js-joystick" data-group-id=${groupId} data-type="zoom"></div>
         </div>
         <div class="control__focus-container">
-          <button type="button" class="control__focus-autofocus js-button" data-group-id=${groupId} data-type="autofocus" title="1-Shot Auto-Focus">AF</button>
+          <button
+            type="button"
+            class="control__focus-autofocus js-button"
+            data-group-id=${groupId}
+            data-type="autofocus"
+            title="1-Shot Auto-Focus"
+            aria-label="1-Shot Auto-Focus"
+          >
+            AF
+          </button>
           <div class="control__focus">
             <div class="control__focus-joystick js-joystick" data-group-id=${groupId} data-type="focus"></div>
           </div>

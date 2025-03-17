@@ -42,6 +42,10 @@
   font-weight: bold;
 }
 
+.control__mapping {
+  flex: 0 0 auto;
+}
+
 .control__device {
   padding: 0.3rem;
   line-height: 1.4;
@@ -57,6 +61,9 @@
 
 .control__pt, .control__zoom, .control__focus {
   overflow: hidden; /* Prevent oversized tap targets from scrolling page */
+
+  color: black;
+  background: gray;
 }
 
 .control__pt {
@@ -66,6 +73,8 @@
   box-sizing: border-box;
   flex: 0 0 auto;
   margin: 0.3rem;
+
+  border-radius: 50%;
 }
 
 .control__pt-bg {
@@ -77,7 +86,6 @@
 
   overflow: hidden;
 
-  background: gray;
   border-radius: 50%;
   transform: rotate(calc(var(--roll) * 45deg));
   transition: transform linear 0.0333s;
@@ -88,7 +96,7 @@
   display: block;
   position: relative;
 
-  outline: var(--crosshair-width) solid black;
+  outline: var(--crosshair-width) solid currentColor;
 }
 
 .control__pt-bg::before {
@@ -114,7 +122,7 @@
   box-sizing: border-box;
 
   border-radius: 50%;
-  background: black;
+  background: currentColor;
   cursor: grab;
   transition: transform linear 0.0333s;
 }
@@ -169,7 +177,6 @@
 
   isolation: isolate;
 
-  background: gray;
   border-radius: calc(var(--thumb-size) / 2);
 }
 

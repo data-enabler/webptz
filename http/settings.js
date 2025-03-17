@@ -47,7 +47,15 @@ export function Settings() {
   }, [theme]);
 
   return html`
-    <button type="button" class="settings__trigger" title="Settings" onClick=${openDialog}>⚙\uFE0F</button>
+    <button
+      type="button"
+      class="settings__trigger"
+      title="Settings"
+      aria-label="Settings"
+      onClick=${openDialog}
+    >
+      ⚙\uFE0F
+    </button>
     <dialog ref=${dialogRef}>
       <form method="dialog">
         <div class="settings__container">

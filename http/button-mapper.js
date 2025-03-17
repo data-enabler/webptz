@@ -109,7 +109,15 @@ export function ButtonMapper({
   }
 
   return html`
-    <button type="button" class="control__mapping" onClick=${openDialog}>Controls</button>
+    <button
+      type="button"
+      class="control__mapping"
+      title="Gamepad Controls"
+      aria-label="Gamepad Controls"
+      onClick=${openDialog}
+    >
+      🎮
+    </button>
     <dialog ref=${dialogRef}>
       <form method="dialog" class="mapper__container">
         <div className="mapper__groups">
