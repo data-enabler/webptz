@@ -107,12 +107,7 @@ export function useServer() {
         return;
       }
       /** @type {ServerState} */
-      const data = {
-        ...rawData,
-        defaultControls: rawData.defaultControls
-          ? mapDefaultControls(rawData.groups, rawData.defaultControls)
-          : null,
-      };
+      const data = convertRawData(rawData);
       setState(data);
     });
 
@@ -133,6 +128,19 @@ export function useServer() {
       console.log('Sending', json);
       ws.current.send(json);
     },
+  };
+}
+
+/**
+ * @param {RawServerState} rawData
+ * @returns {ServerState}
+ */
+function convertRawData(rawData) {
+  return {
+    ...rawData,
+    defaultControls: rawData.defaultControls
+      ? mapDefaultControls(rawData.groups, rawData.defaultControls)
+      : null,
   };
 }
 
@@ -160,14 +168,14 @@ export function unmapDefaultControls(groups, controls) {
 }
 
 /**
- * @param {ServerState|undefined} initialState
+ * @param {RawServerState|undefined} initialState
  * @return {{
  *   state: ServerState,
  *   send: function(CommandMessage|DisconnectMessage|ReconnectMessage|SaveDefaultControlsMessage): void,
  * }}
  */
 export function useMockServer(initialState=DEFAULT_STATE) {
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState(() => convertRawData(initialState));
   return {
     state,
     send: command => {
@@ -199,7 +207,7 @@ export function useMockServer(initialState=DEFAULT_STATE) {
   };
 }
 
-/** @type {ServerState} */
+/** @type {RawServerState} */
 export const DEFAULT_STATE = {
   instance: 'mock',
   groups: [
@@ -210,6 +218,10 @@ export const DEFAULT_STATE = {
     {
       name: 'Cam 2',
       devices: ['ronin2', 'lumix2', 'lanc2'],
+    },
+    {
+      name: 'All Cams Pan/Tilt',
+      devices: ['ronin1', 'ronin2'],
     },
   ],
   devices: {
@@ -244,8 +256,8 @@ export const DEFAULT_STATE = {
       connected: true,
     },
   },
-  defaultControls: {
-    'Cam 1': {
+  defaultControls: [
+    {
       panL: [{padIndex: 0, type: 'axis', inputIndex: 0, multiplier: -1.0}],
       panR: [{padIndex: 0, type: 'axis', inputIndex: 0, multiplier: 1.0}],
       tiltU: [{padIndex: 0, type: 'axis', inputIndex: 1, multiplier: -1.0}],
@@ -258,7 +270,7 @@ export const DEFAULT_STATE = {
       focusN: [{padIndex: 0, type: 'button', inputIndex: 13, multiplier: 1.0}],
       focusA: [{padIndex: 0, type: 'button', inputIndex: 10, multiplier: 1.0}],
     },
-    'Cam 2': {
+    {
       panL: [{padIndex: 0, type: 'axis', inputIndex: 2, multiplier: -1.0}],
       panR: [{padIndex: 0, type: 'axis', inputIndex: 2, multiplier: 1.0}],
       tiltU: [{padIndex: 0, type: 'axis', inputIndex: 3, multiplier: -1.0}],
@@ -271,5 +283,5 @@ export const DEFAULT_STATE = {
       focusN: [{padIndex: 0, type: 'button', inputIndex: 0, multiplier: 1.0}],
       focusA: [{padIndex: 0, type: 'button', inputIndex: 11, multiplier: 1.0}],
     },
-  },
+  ],
 };
