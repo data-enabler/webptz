@@ -187,7 +187,7 @@ export function waitForGamepadInput(callback) {
         continue;
       }
       for (let i = 0; i < pad.buttons.length; i++) {
-        if (pad.buttons[i].pressed) {
+        if (pad.buttons[i].pressed && pad.buttons[i].value > 0.75) {
           callback({
             padIndex: pad.index,
             type: 'button',
@@ -198,7 +198,7 @@ export function waitForGamepadInput(callback) {
         }
       }
       for (let i = 0; i < pad.axes.length; i++) {
-        if (Math.abs(pad.axes[i]) > 0.25) {
+        if (Math.abs(pad.axes[i]) > 0.75) {
           callback({
             padIndex: pad.index,
             type: 'axis',
