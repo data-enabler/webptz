@@ -20,6 +20,7 @@ pub struct Group {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 pub enum DeviceConfig {
     Dummy(DummyConfig),
@@ -40,35 +41,35 @@ pub enum Capability {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DummyConfig {
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
-    pub name: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RoninConfig {
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
-    pub name: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LumixConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub capabilities: Option<Vec<Capability>>,
     pub address: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Vec<Capability>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LancConfig {
+    pub port: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
-    pub port: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
