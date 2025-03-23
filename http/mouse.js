@@ -16,6 +16,7 @@ import { ZERO_STATE } from './state.js';
  * @typedef {{
  *   joysticks: {
  *     panTilt: JoystickControl;
+ *     roll: JoystickControl;
  *     zoom: JoystickControl;
  *     focus: JoystickControl;
  *   };
@@ -229,6 +230,7 @@ function newMouseControl() {
       panTilt: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
       zoom: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
       focus: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
+      roll: { touchId: null, origin: [0, 0], currXY: [0, 0], range: 0 },
     },
     buttons: {
       autofocus: false,
@@ -259,8 +261,9 @@ export function mouseControlsToControlStates(c, prevStates) {
  */
 export function mouseControlToControlState(c, prevState) {
   const [pan, tilt] = getAxes(c.joysticks.panTilt);
-  const zoom = getAxis(c.joysticks.zoom);
-  const focus = getAxis(c.joysticks.focus);
+  const roll = getXAxis(c.joysticks.roll);
+  const zoom = getYAxis(c.joysticks.zoom);
+  const focus = getYAxis(c.joysticks.focus);
   const autofocus = {
     pressed: c.buttons.autofocus,
     active: prevState.autofocus.active || (c.buttons.autofocus && !prevState.autofocus.pressed),
@@ -268,7 +271,7 @@ export function mouseControlToControlState(c, prevState) {
   return {
     pan,
     tilt,
-    roll: 0,
+    roll,
     zoom,
     focus,
     autofocus,
@@ -279,7 +282,20 @@ export function mouseControlToControlState(c, prevState) {
  * @param {JoystickControl} j
  * @returns {number}
  */
-function getAxis(j) {
+function getXAxis(j) {
+  if (j.range === 0) {
+    return 0
+  }
+  const unclamped = (j.currXY[0] - j.origin[0]) / j.range;
+  const y = Math.min(Math.max(unclamped, -1), 1);
+  return y;
+}
+
+/**
+ * @param {JoystickControl} j
+ * @returns {number}
+ */
+function getYAxis(j) {
   if (j.range === 0) {
     return 0
   }

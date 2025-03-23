@@ -119,9 +119,14 @@ function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, on
         ${buttonMapper}
       </header>
       <div class="control__controls">
-        <div class="control__pt">
-          <div class="control__pt-bg"></div>
-          <div class="control__pt-joystick js-joystick" data-group-id=${groupId} data-type="panTilt"></div>
+        <div class="control__ptr-container">
+          <div class="control__roll">
+            <div class="control__roll-joystick js-joystick" data-group-id=${groupId} data-type="roll"></div>
+          </div>
+          <div class="control__pt">
+            <div class="control__pt-bg"></div>
+            <div class="control__pt-joystick js-joystick" data-group-id=${groupId} data-type="panTilt"></div>
+          </div>
         </div>
         <div class="control__zoom">
           <div class="control__zoom-joystick js-joystick" data-group-id=${groupId} data-type="zoom"></div>
