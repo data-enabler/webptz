@@ -11,3 +11,7 @@
     --color-bg: #222425;
   }
 }
+:root[data-theme="dark"] {
+  --color-fg: #dedcd9;
+  --color-bg: #222425;
+}
