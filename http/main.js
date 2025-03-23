@@ -147,11 +147,16 @@ function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, on
           const d = state.devices[id];
           return html`
             <div class="control__device">
-              ${d.name}
-              <br/>
-              <button type="button" disabled=${!d.connected} onClick=${() => onDisconnect(d.id)}>Disconnect</button>
-              ${' '}
-              <button type="button" disabled=${d.connected} onClick=${() => onReconnect(d.id)}>Reconnect</button>
+              <span class="control__device-name">${d.name}</span>
+              <button
+                type="button"
+                class=${d.connected ? 'control__device-disconnect' : 'control__device-connect'}
+                onClick=${() => d.connected ? onDisconnect(d.id) : onReconnect(d.id)}
+                aria-label=${d.connected ? 'Disconnect' : 'Connect'}
+                title=${d.connected ? 'Disconnect' : 'Connect'}
+              >
+                ${d.connected ? '️⏏' : '🔗'}
+              </button>
             </div>
           `;
         })}

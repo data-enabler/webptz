@@ -47,9 +47,18 @@
 }
 
 .control__device {
-  padding: 0.3rem;
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem;
   line-height: 1.4;
+
   border-top: 1px solid currentColor;
+}
+
+.control__device-disconnect {
+  background-color: var(--color-button-bg-warning);
 }
 
 .control__controls {

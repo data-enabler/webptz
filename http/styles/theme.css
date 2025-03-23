@@ -1,6 +1,7 @@
 :root, :root[data-theme="light"] {
   --color-fg: black;
   --color-bg: white;
+  --color-button-bg-warning: pink;
 }
 
 /* set alternate colors for dark mode */
