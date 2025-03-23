@@ -6,6 +6,8 @@ use std::{collections::HashSet, env, error::Error};
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    #[serde(default = "default_port")]
+    pub port: u16,
     pub groups: Vec<Group>,
     pub devices: IndexMap<String, DeviceConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,6 +140,10 @@ pub fn all_capabilities() -> HashSet<Capability> {
     ])
 }
 
+const fn default_port() -> u16 {
+    8000
+}
+
 pub async fn load_config() -> Result<Config, Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let config_path = match args.get(1) {
@@ -176,6 +182,7 @@ fn check_duplicate_group_names(config: &Config) -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_check_duplicate_group_names() {
     let config = Config {
+        port: 8000,
         groups: vec![
             Group {
                 name: "group1".to_string(),
@@ -216,6 +223,7 @@ fn detect_undefined_devices(config: &Config) -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_detect_undefined_devices() {
     let config = Config {
+        port: 8000,
         groups: vec![
             Group {
                 name: "group1".to_string(),

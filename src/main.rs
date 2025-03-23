@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         default_controls: config.default_controls,
     });
 
-    tokio::spawn(web_server(command_tx, state_rx));
+    tokio::spawn(web_server(config.port, command_tx, state_rx));
 
     while let Some(operation) = command_rx.recv().await {
         match operation {
@@ -232,6 +232,7 @@ fn get_device_status(devices: &[Box<dyn Device>]) -> HashMap<String, DeviceStatu
 }
 
 async fn web_server(
+    port: u16,
     command_tx: mpsc::UnboundedSender<Operation>,
     state_rx: watch::Receiver<State>,
 ) {
@@ -263,7 +264,9 @@ async fn web_server(
             any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
+        .await
+        .unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(
         listener,
