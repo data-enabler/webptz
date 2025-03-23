@@ -4,7 +4,7 @@ import { ButtonMapper } from './button-mapper.js';
 import { useGamepadPoll } from './controls.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
-/** @import { ServerState } from './server.js'; */
+/** @import { ServerState, RawServerState } from './server.js'; */
 import { DEFAULT_STATE, unmapDefaultControls, useMockServer, useServer } from './server.js';
 import { Settings } from './settings.js';
 /** @import { ControlStates } from './state.js'; */
@@ -12,7 +12,7 @@ import { ZERO_STATE } from './state.js';
 
 /**
  * @param {{
- *   mock: ServerState|undefined,
+ *   mock: RawServerState|undefined,
  * }} props
  */
 function App({mock}) {
@@ -161,7 +161,7 @@ function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, on
 }
 
 /**
- * @returns {ServerState|undefined}
+ * @returns {RawServerState|undefined}
  */
 function parseMockData() {
   const params = new URLSearchParams(window.location.search);
