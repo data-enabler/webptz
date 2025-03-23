@@ -175,9 +175,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 disconnect_devices(&mut devices).await;
                 break;
             }
-            Operation::SaveDefaultControls(request) => {
+            Operation::SaveDefaultControls(mut request) => {
                 println!("Saving button mappings...");
-                config.default_controls = Some(request);
+                let last_nonempty = request.iter().rposition(|x| !x.is_empty());
+                config.default_controls = match last_nonempty {
+                    Some(idx) => {
+                        request.truncate(idx + 1);
+                        Some(request)
+                    }
+                    None => None,
+                };
                 config::save_config(&config).await?;
                 state_tx.send_modify(|s| {
                     s.default_controls = config.default_controls;

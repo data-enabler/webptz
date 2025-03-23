@@ -8,6 +8,7 @@ use std::{collections::HashSet, env, error::Error};
 pub struct Config {
     pub groups: Vec<Group>,
     pub devices: IndexMap<String, DeviceConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default_controls: Option<Vec<Mappings>>,
 }
 
@@ -39,6 +40,7 @@ pub enum Capability {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DummyConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
     pub name: String,
 }
@@ -46,6 +48,7 @@ pub struct DummyConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RoninConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
     pub name: String,
 }
@@ -53,14 +56,17 @@ pub struct RoninConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LumixConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
     pub address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LancConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
     pub port: String,
 }
@@ -68,17 +74,48 @@ pub struct LancConfig {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Mappings {
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub pan_l: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub pan_r: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub tilt_u: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub tilt_d: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub roll_l: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub roll_r: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub zoom_i: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub zoom_o: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub focus_f: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub focus_n: Option<Vec<PadInput>>,
+    #[serde(skip_serializing_if = "empty_or_none")]
     pub focus_a: Option<Vec<PadInput>>,
+}
+
+impl Mappings {
+    pub fn is_empty(&self) -> bool {
+        [
+            &self.pan_l,
+            &self.pan_r,
+            &self.tilt_u,
+            &self.tilt_d,
+            &self.roll_l,
+            &self.roll_r,
+            &self.zoom_i,
+            &self.zoom_o,
+            &self.focus_f,
+            &self.focus_n,
+            &self.focus_a,
+        ]
+        .iter()
+        .all(|v| empty_or_none(v))
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -207,4 +244,8 @@ fn test_detect_undefined_devices() {
         default_controls: None,
     };
     assert!(detect_undefined_devices(&config).is_err());
+}
+
+fn empty_or_none(val: &Option<Vec<PadInput>>) -> bool {
+    val.as_ref().is_none_or(|v| v.is_empty())
 }
