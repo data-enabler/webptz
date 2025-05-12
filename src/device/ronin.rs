@@ -13,7 +13,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use tokio::{sync::watch, time::timeout};
+use tokio::{sync::watch, task::JoinHandle, time::timeout};
 
 use crate::config::{self, all_capabilities, Capability};
 
@@ -105,8 +105,8 @@ pub struct Ronin {
 struct Connection {
     peripheral: Peripheral,
     characteristic: Arc<Mutex<Characteristic>>,
-    _event_task: tokio::task::JoinHandle<()>,
-    _zoom_task: tokio::task::JoinHandle<()>,
+    _event_task: JoinHandle<()>,
+    _zoom_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>,
     zoom_speed: watch::Sender<f64>,
 }
 
@@ -320,64 +320,71 @@ fn create_zoom_task(
     current_zoom_rx: watch::Receiver<u16>,
     zoom_movement_rx: watch::Receiver<Instant>,
     mut zoom_speed_rx: watch::Receiver<f64>,
-) -> tokio::task::JoinHandle<()> {
+) -> tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
     let name = name.to_owned();
-    tokio::spawn(async move {
-        loop {
-            zoom_speed_rx.changed().await.unwrap();
-            let mut speed = *zoom_speed_rx.borrow_and_update();
-            let mut prev_speed: f64 = 0.0;
-            let mut target_zoom = -1;
-            while speed != 0.0 {
-                let increment = scale_zoom_value(speed);
-                let curr_zoom = *current_zoom_rx.borrow();
-                if prev_speed == 0.0 || prev_speed.is_sign_positive() != speed.is_sign_positive() {
-                    let initial_increment =
-                        increment.signum() * increment.abs().max(ZOOM_MIN_INITIAL_INCREMENT);
-                    println!(
-                        "{}: Starting zoom. Step: {}, Initial step: {}, Current zoom level: {}",
-                        name, increment, initial_increment, curr_zoom
-                    );
-                    target_zoom = curr_zoom as i32 + initial_increment;
-                } else if zoom_movement_rx.borrow().elapsed() < Duration::from_millis(200) {
-                    target_zoom += increment;
+    let err_name = name.to_owned();
+    tokio::spawn(
+        async move {
+            loop {
+                if zoom_speed_rx.changed().await.is_err() {
+                    return Ok(());
                 }
+                let mut speed = *zoom_speed_rx.borrow_and_update();
+                let mut prev_speed: f64 = 0.0;
+                let mut target_zoom = -1;
+                while speed != 0.0 {
+                    let increment = scale_zoom_value(speed);
+                    let curr_zoom = *current_zoom_rx.borrow();
+                    if prev_speed == 0.0
+                        || prev_speed.is_sign_positive() != speed.is_sign_positive()
+                    {
+                        let initial_increment =
+                            increment.signum() * increment.abs().max(ZOOM_MIN_INITIAL_INCREMENT);
+                        println!(
+                            "{}: Starting zoom. Step: {}, Initial step: {}, Current zoom level: {}",
+                            name, increment, initial_increment, curr_zoom
+                        );
+                        target_zoom = curr_zoom as i32 + initial_increment;
+                    } else if zoom_movement_rx.borrow().elapsed() < Duration::from_millis(200) {
+                        target_zoom += increment;
+                    }
 
-                let clamped_target_zoom =
-                    target_zoom.clamp(ZOOM_MIN as i32, ZOOM_MAX as i32) as u16;
-                let at_min_endpoint = clamped_target_zoom <= curr_zoom
-                    && curr_zoom < ZOOM_MIN + ZOOM_ENDPOINT_TOLERANCE;
-                let at_max_endpoint = clamped_target_zoom >= curr_zoom
-                    && curr_zoom > ZOOM_MAX - ZOOM_ENDPOINT_TOLERANCE;
-                if !(at_min_endpoint || at_max_endpoint) {
-                    let content = add_checksum(
-                        &[
-                            hex::decode("551204c702df").unwrap(),
-                            get_seq(&next_seq).to_le_bytes().to_vec(),
-                            hex::decode("00042f010002").unwrap(),
-                            clamped_target_zoom.to_le_bytes().to_vec(),
-                        ]
-                        .concat(),
-                    );
+                    let clamped_target_zoom =
+                        target_zoom.clamp(ZOOM_MIN as i32, ZOOM_MAX as i32) as u16;
+                    let at_min_endpoint = clamped_target_zoom <= curr_zoom
+                        && curr_zoom < ZOOM_MIN + ZOOM_ENDPOINT_TOLERANCE;
+                    let at_max_endpoint = clamped_target_zoom >= curr_zoom
+                        && curr_zoom > ZOOM_MAX - ZOOM_ENDPOINT_TOLERANCE;
+                    if !(at_min_endpoint || at_max_endpoint) {
+                        let content = add_checksum(
+                            &[
+                                hex::decode("551204c702df").unwrap(),
+                                get_seq(&next_seq).to_le_bytes().to_vec(),
+                                hex::decode("00042f010002").unwrap(),
+                                clamped_target_zoom.to_le_bytes().to_vec(),
+                            ]
+                            .concat(),
+                        );
 
-                    let cmd_characteristic = cmd_characteristic.lock().unwrap().clone();
-                    peripheral
-                        .write(&cmd_characteristic, &content, WriteType::WithoutResponse)
-                        .await
-                        .unwrap();
+                        let cmd_characteristic = cmd_characteristic.lock().unwrap().clone();
+                        peripheral
+                            .write(&cmd_characteristic, &content, WriteType::WithoutResponse)
+                            .await?;
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    prev_speed = speed;
+                    speed = *zoom_speed_rx.borrow_and_update();
                 }
-
-                tokio::time::sleep(Duration::from_millis(50)).await;
-                prev_speed = speed;
-                speed = *zoom_speed_rx.borrow_and_update();
+                println!(
+                    "{}: Ending zoom. Current zoom level: {}",
+                    name,
+                    *current_zoom_rx.borrow(),
+                );
             }
-            println!(
-                "{}: Ending zoom. Current zoom level: {}",
-                name,
-                *current_zoom_rx.borrow(),
-            );
         }
-    })
+        .inspect_err(move |e| println!("{}: Ending zoom task: {:?}", err_name, e)),
+    )
 }
 
 pub fn create(id: &str, adapter: Adapter, config: &config::RoninConfig) -> Ronin {
