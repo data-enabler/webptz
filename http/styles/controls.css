@@ -44,7 +44,11 @@
 }
 
 .control__mapping {
+  width: var(--thumb-size);
   flex: 0 0 auto;
+
+  padding-inline: 0;
+  box-sizing: border-box;
 }
 
 .control__device {
@@ -58,8 +62,35 @@
   border-top: 1px solid currentColor;
 }
 
-.control__device-disconnect {
+.control__device-connection {
+  width: var(--thumb-size);
+
+  padding-inline: 0;
+  box-sizing: border-box;
+}
+
+.control__device-connection-icon {
+  display: none;
+}
+
+.control__device-connection--connected, .control__device-connection--disconnected:hover {
+  background-color: var(--color-button-bg-ok);
+  color: var(--color-button-fg-ok);
+}
+
+.control__device-connection--disconnected, .control__device-connection--connected:hover {
   background-color: var(--color-button-bg-warning);
+  color: var(--color-button-fg-warning);
+}
+
+.control__device-connection--connected:not(:hover) .control__device-connection-icon--connect,
+.control__device-connection--disconnected:hover .control__device-connection-icon--connect {
+  display: inline-block;
+}
+
+.control__device-connection--disconnected:not(:hover) .control__device-connection-icon--disconnect,
+.control__device-connection--connected:hover .control__device-connection-icon--disconnect {
+  display: inline-block;
 }
 
 .control__controls {
@@ -273,7 +304,6 @@
   box-sizing: border-box;
 
   padding: 0;
-  line-height: var(--thumb-size-2);
 
   filter: invert(var(--autofocus));
 }

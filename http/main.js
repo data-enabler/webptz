@@ -2,6 +2,7 @@ import { html, render, useState, useEffect } from 'htm/preact';
 
 import { ButtonMapper } from './button-mapper.js';
 import { useGamepadPoll } from './controls.js';
+import { Icon } from './icon.js';
 /** @import { Mappings } from './mapping.js'; */
 import { areMappingsEqual } from './mapping.js';
 /** @import { ServerState, RawServerState } from './server.js'; */
@@ -155,12 +156,21 @@ function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, on
               <span class="control__device-name">${d.name}</span>
               <button
                 type="button"
-                class=${d.connected ? 'control__device-disconnect' : 'control__device-connect'}
+                class=${`control__device-connection ${d.connected ? 'control__device-connection--connected' : 'control__device-connection--disconnected'}`}
                 onClick=${() => d.connected ? onDisconnect(d.id) : onReconnect(d.id)}
                 aria-label=${d.connected ? 'Disconnect' : 'Connect'}
                 title=${d.connected ? 'Disconnect' : 'Connect'}
               >
-                ${d.connected ? '️⏏' : '🔗'}
+                <${Icon}
+                  name="link"
+                  label="Connect"
+                  class="control__device-connection-icon control__device-connection-icon--connect"
+                />
+                <${Icon}
+                  name="unlink"
+                  label="Disconnect"
+                  class="control__device-connection-icon control__device-connection-icon--disconnect"
+                />
               </button>
             </div>
           `;
