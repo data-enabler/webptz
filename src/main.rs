@@ -4,6 +4,8 @@ use axum::http::{header, HeaderValue};
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
+#[cfg(not(debug_assertions))]
+use axum_embed::ServeEmbed;
 use axum_extra::{headers, TypedHeader};
 use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
@@ -11,6 +13,8 @@ use config::{Group, Mappings};
 use device::Device;
 use futures::{future, SinkExt as _, StreamExt, TryFutureExt};
 use itertools::Itertools;
+#[cfg(not(debug_assertions))]
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -53,6 +57,11 @@ struct DeviceStatus {
     name: String,
     connected: bool,
 }
+
+#[cfg(not(debug_assertions))]
+#[derive(RustEmbed, Clone)]
+#[folder = "http/"]
+struct Assets;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -251,10 +260,16 @@ async fn web_server(
 
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("http");
 
+    #[cfg(debug_assertions)]
+    let file_server = ServeDir::new(assets_dir).append_index_html_on_directories(true);
+
+    #[cfg(not(debug_assertions))]
+    let file_server = ServeEmbed::<Assets>::new();
+
     let cloned_tx = command_tx.clone();
     let cloned_rx = state_rx.clone();
     let app = Router::new()
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .fallback_service(file_server)
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache"),
