@@ -13,7 +13,7 @@ export function Icon({
   'class': className,
   ...additionalProps
 }) {
-  const imgUrl = `/images/${name}.svg#icon`;
+  const imgUrl = `images/${name}.svg#icon`;
   return html`
     <svg
       class=${`icon icon-${name} ${className || ''}`}
