@@ -2,50 +2,60 @@
   "port": 8000,
   "groups": [
     {
-      "name": "Group 1",
+      "name": "Tight",
       "devices": [
-        "gimbal1",
-        "camera1"
+        "ronin1",
+        "lumix1"
       ]
     },
     {
-      "name": "Group 2",
+      "name": "Wide",
       "devices": [
-        "gimbal2",
-        "camera2"
-      ]
-    },
-    {
-      "name": "All Gimbals",
-      "devices": [
-        "gimbal1",
-        "gimbal2"
+        "ronin2",
+        "lumix2",
+        "lanc2"
       ]
     }
   ],
   "devices": {
-    "gimbal1": {
-      "type": "dummy",
-      "name": "Gimbal 1"
+    "ronin1": {
+      "type": "ronin",
+      "name": "DJI RSC 2-000001"
     },
-    "gimbal2": {
-      "type": "dummy",
-      "name": "Gimbal 2",
+    "ronin2": {
+      "type": "ronin",
+      "name": "DJI RSC 2-000002",
       "capabilities": [
-        "ptr",
-        "zoom"
+        "ptr"
       ]
     },
-    "camera1": {
-      "type": "dummy",
-      "name": "Camera 1"
-    },
-    "camera2": {
-      "type": "dummy",
-      "name": "Camera 1",
+    "lumix1": {
+      "type": "lumix",
+      "address": "192.168.0.11",
+      "password": "0123456789ABCDEF",
       "capabilities": [
         "focus",
         "autofocus"
+      ]
+    },
+    "lumix2": {
+      "type": "lumix",
+      "address": "192.168.0.12",
+      "password": "0123456789ABCDEF",
+      "capabilities": [
+        "zoom",
+        "autofocus"
+      ]
+    },
+    "lanc1": {
+      "type": "lanc",
+      "port": "COM4"
+    },
+    "lanc2": {
+      "type": "lanc",
+      "port": "COM6",
+      "capabilities": [
+        "focus"
       ]
     }
   },
@@ -112,7 +122,7 @@
           "padIndex": 0,
           "type": "button",
           "inputIndex": 4,
-          "multiplier": 1.0
+          "multiplier": 0.3
         }
       ],
       "focusF": [
@@ -120,7 +130,7 @@
           "padIndex": 0,
           "type": "button",
           "inputIndex": 12,
-          "multiplier": 1.0
+          "multiplier": 0.3
         }
       ],
       "focusN": [
@@ -128,7 +138,7 @@
           "padIndex": 0,
           "type": "button",
           "inputIndex": 13,
-          "multiplier": 1.0
+          "multiplier": 0.3
         }
       ],
       "focusA": [
@@ -136,96 +146,6 @@
           "padIndex": 0,
           "type": "button",
           "inputIndex": 10,
-          "multiplier": 1.0
-        }
-      ]
-    },
-    {
-      "panL": [
-        {
-          "padIndex": 0,
-          "type": "axis",
-          "inputIndex": 2,
-          "multiplier": -1.0
-        }
-      ],
-      "panR": [
-        {
-          "padIndex": 0,
-          "type": "axis",
-          "inputIndex": 2,
-          "multiplier": 1.0
-        }
-      ],
-      "tiltU": [
-        {
-          "padIndex": 0,
-          "type": "axis",
-          "inputIndex": 3,
-          "multiplier": -1.0
-        }
-      ],
-      "tiltD": [
-        {
-          "padIndex": 0,
-          "type": "axis",
-          "inputIndex": 3,
-          "multiplier": 1.0
-        }
-      ],
-      "rollL": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 2,
-          "multiplier": 1.0
-        }
-      ],
-      "rollR": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 1,
-          "multiplier": 1.0
-        }
-      ],
-      "zoomI": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 7,
-          "multiplier": 1.0
-        }
-      ],
-      "zoomO": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 5,
-          "multiplier": 1.0
-        }
-      ],
-      "focusF": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 3,
-          "multiplier": 1.0
-        }
-      ],
-      "focusN": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 0,
-          "multiplier": 1.0
-        }
-      ],
-      "focusA": [
-        {
-          "padIndex": 0,
-          "type": "button",
-          "inputIndex": 11,
           "multiplier": 1.0
         }
       ]
