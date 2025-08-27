@@ -27,6 +27,12 @@
       "name": "DJI RSC 2-000002",
       "capabilities": [
         "ptr"
+      ],
+      "options": [
+        "reverseZoom",
+        "reversePan",
+        "reverseTilt",
+        "reverseRoll"
       ]
     },
     "lumix1": {

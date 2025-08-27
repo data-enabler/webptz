@@ -48,12 +48,23 @@ pub struct DummyConfig {
     pub capabilities: Option<Vec<Capability>>,
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::enum_variant_names)]
+pub enum RoninOption {
+    ReversePan,
+    ReverseTilt,
+    ReverseRoll,
+    ReverseZoom,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RoninConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<Vec<Capability>>,
+    pub options: Option<Vec<RoninOption>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

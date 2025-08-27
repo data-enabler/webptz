@@ -15,7 +15,7 @@ use std::{
 };
 use tokio::{sync::watch, task::JoinHandle, time::timeout};
 
-use crate::config::{self, all_capabilities, Capability};
+use crate::config::{self, all_capabilities, Capability, RoninOption};
 
 #[allow(unused)]
 pub const SERVICE_UUID: uuid::Uuid = uuid_from_u16(0xfff0);
@@ -100,6 +100,7 @@ pub struct Ronin {
     adapter: Adapter,
     connection: Option<Connection>,
     capabilities: HashSet<Capability>,
+    options: HashSet<RoninOption>,
 }
 
 struct Connection {
@@ -219,10 +220,31 @@ impl super::Device for Ronin {
                 println!("{}: Not connected", name);
             }
             Some(ref mut c) => {
+                let pan = if self.options.contains(&RoninOption::ReversePan) {
+                    -command.pan
+                } else {
+                    command.pan
+                };
+                let tilt = if self.options.contains(&RoninOption::ReverseTilt) {
+                    -command.tilt
+                } else {
+                    command.tilt
+                };
+                let roll = if self.options.contains(&RoninOption::ReverseRoll) {
+                    -command.roll
+                } else {
+                    command.roll
+                };
+                let zoom = if self.options.contains(&RoninOption::ReverseZoom) {
+                    -command.zoom
+                } else {
+                    command.zoom
+                };
+
                 let send_ptr = self.capabilities.contains(&Capability::Ptr)
-                    && (command.pan != 0.0 || command.tilt != 0.0 || command.roll != 0.0);
+                    && (pan != 0.0 || tilt != 0.0 || roll != 0.0);
                 let send_zoom = self.capabilities.contains(&Capability::Zoom)
-                    && (command.zoom != 0.0 || *c.zoom_speed.borrow() != 0.0);
+                    && (zoom != 0.0 || *c.zoom_speed.borrow() != 0.0);
                 if !send_ptr && !send_zoom {
                     return Ok(());
                 }
@@ -230,12 +252,7 @@ impl super::Device for Ronin {
                 c.try_resume_connection(&name).await?;
 
                 if send_ptr {
-                    let content = create_packet(
-                        get_seq(&self.next_seq),
-                        command.pan,
-                        command.tilt,
-                        command.roll,
-                    );
+                    let content = create_packet(get_seq(&self.next_seq), pan, tilt, roll);
                     print!("{}: Sending PTR command {}", name, hex::encode(&content));
                     let cmd_characteristic = c.characteristic.lock().unwrap().clone();
                     c.peripheral
@@ -246,7 +263,7 @@ impl super::Device for Ronin {
                 }
 
                 if send_zoom {
-                    c.zoom_speed.send_replace(command.zoom);
+                    c.zoom_speed.send_replace(zoom);
                 }
             }
         }
@@ -400,6 +417,11 @@ pub fn create(id: &str, adapter: Adapter, config: &config::RoninConfig) -> Ronin
             .clone()
             .map(HashSet::from_iter)
             .unwrap_or_else(all_capabilities),
+        options: config
+            .options
+            .clone()
+            .map(HashSet::from_iter)
+            .unwrap_or_default(),
     }
 }
 
