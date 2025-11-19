@@ -279,9 +279,18 @@ async fn web_server(
             any(|ws, user_agent, info| ws_handler(cloned_tx, cloned_rx, ws, user_agent, info)),
         );
 
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
-        .await
-        .unwrap();
+    let bind_res = tokio::net::TcpListener::bind(("0.0.0.0", port)).await;
+    if bind_res.is_err() {
+        eprintln!(
+            "Failed to bind to port {}: {}",
+            port,
+            bind_res.err().unwrap()
+        );
+        command_tx.send(Operation::Shutdown).unwrap();
+        return;
+    }
+    let listener = bind_res.unwrap();
+
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(
         listener,
