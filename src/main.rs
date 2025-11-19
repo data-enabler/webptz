@@ -100,6 +100,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let ronin = device::ronin::create(id, central.clone(), ronin_config);
                     Box::new(ronin)
                 }
+                config::DeviceConfig::Crane(crane_config) => {
+                    let crane = device::crane::create(id, central.clone(), crane_config);
+                    Box::new(crane)
+                }
                 config::DeviceConfig::Lumix(lumix_config) => {
                     let lumix = device::lumix::create(id, lumix_config);
                     Box::new(lumix)

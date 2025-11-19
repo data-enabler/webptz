@@ -3,6 +3,7 @@ use std::error::Error;
 use async_trait::async_trait;
 use serde::Deserialize;
 
+pub mod crane;
 pub mod dummy;
 pub mod lanc;
 pub mod lumix;

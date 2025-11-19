@@ -15,7 +15,7 @@ use std::{
 };
 use tokio::{sync::watch, task::JoinHandle, time::timeout};
 
-use crate::config::{self, all_capabilities, Capability, RoninOption};
+use crate::config::{all_capabilities, Capability, RoninConfig, RoninOption};
 
 #[allow(unused)]
 pub const SERVICE_UUID: uuid::Uuid = uuid_from_u16(0xfff0);
@@ -404,7 +404,7 @@ fn create_zoom_task(
     )
 }
 
-pub fn create(id: &str, adapter: Adapter, config: &config::RoninConfig) -> Ronin {
+pub fn create(id: &str, adapter: Adapter, config: &RoninConfig) -> Ronin {
     let (next_seq, _) = watch::channel(0);
     Ronin {
         id: id.to_owned(),
