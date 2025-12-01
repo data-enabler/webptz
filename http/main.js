@@ -98,7 +98,7 @@ function App({mock}) {
  *   controlStates: ControlStates,
  *   onDisconnect: function(string): void,
  *   onReconnect: function(string): void,
- *   buttonMapper: import('react').ReactNode,
+ *   buttonMapper: ReturnType<html>,
  * }} props
  */
 function DeviceGroup({state, groupId, deviceIds, controlStates, onDisconnect, onReconnect, buttonMapper}) {

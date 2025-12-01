@@ -180,7 +180,7 @@ export function useMockServer(initialState=DEFAULT_STATE) {
     state,
     send: command => {
       if ('disconnect' in command) {
-        setState((state) => ({
+        setState((/** @type {ServerState} */ state) => ({
           ...state,
           devices: {
             ...state.devices,
@@ -192,7 +192,7 @@ export function useMockServer(initialState=DEFAULT_STATE) {
         }));
       }
       if ('reconnect' in command) {
-        setState((state) => ({
+        setState((/** @type {ServerState} */ state) => ({
           ...state,
           devices: {
             ...state.devices,
