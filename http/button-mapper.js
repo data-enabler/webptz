@@ -62,8 +62,12 @@ export function ButtonMapper({
 
   const [target, setTarget] = useState(/** @type {[string, keyof Mapping]|null} */ (null));
   useEffect(() => {
+    if (!target) {
+      return;
+    }
     return waitForGamepadInput(padInput => {
-      if (!target) {
+      setTarget(null);
+      if (!padInput) {
         return;
       }
       setNewMappings((/** @type {Mappings} */ m) => {
@@ -81,7 +85,6 @@ export function ButtonMapper({
         };
         return updated;
       });
-      setTarget(null);
     });
   }, [target, setTarget, setNewMappings]);
 

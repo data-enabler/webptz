@@ -257,7 +257,7 @@ function ignoreDeadzone(val) {
 }
 
 /**
- * @param {function(PadInput): void} callback
+ * @param {function(PadInput|null): void} callback
  * @returns {function(): void} a cancel/cleanup function
  */
 export function waitForGamepadInput(callback) {
@@ -290,8 +290,18 @@ export function waitForGamepadInput(callback) {
   }
   const interval = setInterval(findPressedInput, 100);
 
+  /** @type {function(KeyboardEvent): void} */
+  const cancelHandler = e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      callback(null);
+    }
+  }
+  document.addEventListener('keydown', cancelHandler);
+
   return function cleanup() {
     clearInterval(interval);
+    document.removeEventListener('keydown', cancelHandler);
   };
 }
 
