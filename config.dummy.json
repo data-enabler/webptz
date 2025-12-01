@@ -111,8 +111,16 @@
         {
           "padIndex": 0,
           "type": "button",
-          "inputIndex": 4,
-          "multiplier": 1.0
+          "inputIndex": 6,
+          "multiplier": 1.0,
+          "modifiers": [
+            {
+              "padIndex": 0,
+              "type": "button",
+              "inputIndex": 4,
+              "multiplier": 1.0
+            }
+          ]
         }
       ],
       "focusF": [
@@ -201,8 +209,16 @@
         {
           "padIndex": 0,
           "type": "button",
-          "inputIndex": 5,
-          "multiplier": 1.0
+          "inputIndex": 7,
+          "multiplier": 1.0,
+          "modifiers": [
+            {
+              "padIndex": 0,
+              "type": "button",
+              "inputIndex": 5,
+              "multiplier": 1.0
+            }
+          ]
         }
       ],
       "focusF": [

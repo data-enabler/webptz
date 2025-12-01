@@ -1,6 +1,7 @@
 :root, :root[data-theme="light"] {
   --color-fg: black;
   --color-bg: white;
+  --color-changed: darkgoldenrod;
   --color-button-bg-warning: darkred;
   --color-button-fg-warning: white;
   --color-button-bg-ok: #005cb5;
@@ -13,9 +14,11 @@
   :root {
     --color-fg: #dedcd9;
     --color-bg: #222425;
+    --color-changed: yellow;
   }
 }
 :root[data-theme="dark"] {
   --color-fg: #dedcd9;
   --color-bg: #222425;
+  --color-changed: yellow;
 }

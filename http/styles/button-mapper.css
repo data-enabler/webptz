@@ -49,13 +49,18 @@
 
 .mapper-inputs {
   box-sizing: border-box;
-  min-width: 11em;
+  min-width: 9.5em;
   margin-bottom: 0.25rem;
 
   display: flex;
   flex-flow: column nowrap;
 
   border: 1px solid currentColor;
+}
+
+.mapper-inputs--changed .mapper-inputs__heading::after {
+  content: '*';
+  color: var(--color-changed);
 }
 
 .mapper-inputs__heading {
@@ -68,38 +73,75 @@
   border-bottom: 1px solid currentColor;
 }
 
+.mapper-inputs__add {
+  border-radius: 0;
+}
+
 .mapper-input {
   display: flex;
   flex-flow: column nowrap;
   align-items: stretch;
   gap: 0.1rem;
-  padding: 0.25rem;
+  padding: 0.15rem;
 
   border-bottom: 1px solid currentColor;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) content-box,
+    var(--color-bg);
 }
 
 .mapper-input--changed {
-  color: black;
-  background-color: lightyellow;
+  background-color: var(--color-changed);
 }
 
 .mapper-input__line1 {
   display: flex;
   flex-flow: row nowrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.25em;
+  padding: 0.15rem 0.15rem 0;
 
   line-height: 1.4;
 }
 
+.mapper-input__line2 {
+  padding: 0 0.15rem 0.15rem;
+  contain: size;
+  contain-intrinsic-height: 1lh;
+}
+
+.mapper-input__line2 > input {
+  width: 100%;
+}
+
 .mapper-input__pill {
-  padding-inline-end: 0.1em;
+  display: inline-block;
+  vertical-align: 0.2ex;
+
+  line-height: 1;
 
   color: black;
   background-color: lightgray;
-  border: 1px solid currentColor;
+  border: 1px outset white;
+  font-size: 0.833em;
   font-family: monospace;
-  font-size: 1.25em;
   font-variant-numeric: tabular-nums;
+}
+
+.mapper-input__pill__index {
+  display: inline-block;
+
+  padding-inline: 0.1em;
+  line-height: 1;
+
+  color: white;
+  background-color: #333;
+  border: 1px inset black;
+}
+
+.mapper-input__modifiers {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: flex-start;
 }

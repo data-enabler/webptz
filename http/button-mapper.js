@@ -66,7 +66,7 @@ export function ButtonMapper({
       if (!target) {
         return;
       }
-      setNewMappings(m => {
+      setNewMappings((/** @type {Mappings} */ m) => {
         const [groupId, inputId] = target;
         const mapping = m[groupId] || EMPTY_MAPPING;
         // I don't know why TypeScript doesn't like this without the superfluous type cast
@@ -267,8 +267,9 @@ function MappedInputs({
 }) {
   const padInputs = mapping[inputName] || [];
   const defaultPadInputs = defaultMapping[inputName] || [];
+  const lengthChanged = padInputs.length !== defaultPadInputs.length;
   return html`
-    <section class="mapper-inputs">
+    <section class="mapper-inputs ${lengthChanged ? 'mapper-inputs--changed' : ''}">
       <h3 class="mapper-inputs__heading">${getInputNameDisplayValue(inputName)}</h3>
       ${padInputs.map((padInput, i) => {
         const changed = !arePadInputsEqual(padInput, defaultPadInputs[i]);
@@ -276,7 +277,7 @@ function MappedInputs({
           <${MappedInput} inputName=${inputName} padInput=${padInput} index=${i} setMapping=${setMapping} changed=${changed} />
         `;
       })}
-      <button type="button" onClick=${makeTarget}>
+      <button class="mapper-inputs__add" type="button" onClick=${makeTarget}>
         ${isTarget ? `Waiting for gamepad input...` : `Add Mapping`}
       </button>
     </section>
@@ -300,8 +301,10 @@ function MappedInput({
   setMapping,
   changed,
 }) {
-  const displayType = getInputTypeDisplayValue(padInput.type);
-  const sign = padInput.multiplier >= 0 ? 1 : -1;
+  const multiplier = padInput.multiplier;
+  const sign = getSign(multiplier);
+  const isAnalog = inputName !== 'focusA';
+
   /**
    * @param {number} val
    */
@@ -324,53 +327,77 @@ function MappedInput({
     });
   }
 
-  if (inputName === 'focusA') {
-    return html`
-      <div class="mapper-input ${changed ? 'mapper-input--changed' : ''}">
-        <div class="mapper-input__line1">
-          <span>
-            <span className="mapper-input__pill">
-              🎮#${padInput.padIndex}
-            </span>
-            ${' '}
-            <span className="mapper-input__pill">
-              ${getInputTypeDisplayValue(padInput.type)}#${padInput.inputIndex}
-            </span>
-          </span>
-          ${' '}
-          <button type="button" aria-label="Remove" onClick=${remove}>X</button>
-        </div>
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="mapper-input ${changed ? 'mapper-input--changed' : ''}">
-      <div class="mapper-input__line1">
-        <span>
-          <span className="mapper-input__pill">
-            🎮#${padInput.padIndex}
-          </span>
-          ${' '}
-          <span className="mapper-input__pill">
-            ${getInputTypeDisplayValue(padInput.type)}#${padInput.inputIndex}
-          </span>
-          ${` × ${padInput.multiplier.toFixed(1)}`}
-        </span>
-        ${' '}
-        <button type="button" aria-label="Remove" onClick=${remove}>X</button>
-      </div>
+  const multiplierInput = html`
+    <div class="mapper-input__line2">
       <input
-        class="mapper-input__line2"
         type="range"
         name=${`mapping[${inputName}][${index}].multiplier`}
-        min="0.1"
+        min="0.0"
         max="1.0"
         step="0.1"
         value=${padInput.multiplier * sign}
         onInput=${(/** @type {InputEvent} */ e) => setMultiplier(+/** @type {HTMLInputElement} */(e.target).value)}
       />
     </div>
+  `
+  const modifiers = padInput.modifiers
+    ?.map(m => html`<span><${InputPill} padInput=${m} /> +</span>`);
+
+  return html`
+    <div class="mapper-input ${changed ? 'mapper-input--changed' : ''}">
+      <div class="mapper-input__line1">
+        <span>
+          <span class="mapper-input__modifiers">
+            ${modifiers}
+          </span>
+          <${InputPill} padInput=${padInput} />
+          ${isAnalog && ` ×${padInput.multiplier.toFixed(1)}`}
+        </span>
+        ${' '}
+        <button type="button" aria-label="Remove" onClick=${remove}>X</button>
+      </div>
+      ${isAnalog && multiplierInput}
+    </div>
+  `;
+}
+
+/**
+ * Like Math.sign, but returns -1 for -0 and 1 for 0
+ * @param {number} num 
+ * @returns {number}
+ */
+function getSign(num) {
+  if (num < 0 || Object.is(num, -0)) {
+    return -1;
+  }
+  return 1;
+}
+
+/**
+ * @param {{
+ *   padInput: PadInput,
+ * }} props
+ */
+function InputPill({
+  padInput,
+}) {
+  const displayType = getInputTypeDisplayValue(padInput.type);
+  return html`
+    <span title=${`Gamepad ${padInput.padIndex}, ${padInput.type} ${padInput.inputIndex}`}>
+      <span className="mapper-input__pill">
+        🎮
+        <span className="mapper-input__pill__index">
+          ${padInput.padIndex}
+        </span>
+      </span>
+      ${' '}
+      <span className="mapper-input__pill">
+        ${displayType}
+        <span className="mapper-input__pill__index">
+          ${padInput.inputIndex}
+        </span>
+      </span>
+    </span>
   `;
 }
 

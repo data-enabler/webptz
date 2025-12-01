@@ -159,6 +159,18 @@ pub struct PadInput {
     pub input_type: String,
     pub input_index: usize,
     pub multiplier: f32,
+    #[serde(skip_serializing_if = "empty_or_none")]
+    pub modifiers: Option<Vec<UnmodifiedPadInput>>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnmodifiedPadInput {
+    pub pad_index: usize,
+    #[serde(rename = "type")]
+    pub input_type: String,
+    pub input_index: usize,
+    pub multiplier: f32,
 }
 
 pub fn all_capabilities() -> HashSet<Capability> {
@@ -285,6 +297,6 @@ fn test_detect_undefined_devices() {
     assert!(detect_undefined_devices(&config).is_err());
 }
 
-fn empty_or_none(val: &Option<Vec<PadInput>>) -> bool {
+fn empty_or_none<T>(val: &Option<Vec<T>>) -> bool {
     val.as_ref().is_none_or(|v| v.is_empty())
 }

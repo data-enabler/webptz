@@ -8,6 +8,16 @@
  *   readonly type: "axis"|"button",
  *   readonly inputIndex: number,
  *   readonly multiplier: number,
+ * }} UnmodifiedInput
+ */
+
+/**
+ * @typedef {{
+ *   readonly padIndex: number,
+ *   readonly type: "axis"|"button",
+ *   readonly inputIndex: number,
+ *   readonly multiplier: number,
+ *   readonly modifiers?: UnmodifiedInput[],
  * }} PadInput
  */
 
@@ -46,6 +56,7 @@ export const EMPTY_MAPPING = Object.freeze({
   focusA: [],
 });
 const DEADZONE = 0.1;
+const PRESSED_THRESHOLD = 0.75;
 
 /**
  * @param {Gamepad|null} pad
@@ -59,11 +70,8 @@ export function normalizeGamepad(pad) {
   if (pad.id.includes('DualSense') && pad.mapping != 'standard') {
     const {axes: origAxes, buttons: origButtons} = pad;
 
-    // DualSense triggers are cursed; they have a value of 0.0 until you first
-    // press them. Relying on the assumption that 0.0 is basically impossible
-    // to get otherwise.
-    const l2 = ((pad.axes[3] || -1) + 1) / 2;
-    const r2 = ((pad.axes[4] || -1) + 1) / 2;
+    const l2 = axisToButtonValue(pad.axes[3]);
+    const r2 = axisToButtonValue(pad.axes[4]);
 
     // DualSense dpad is encoded using an axis.
     // -1 is up, +1 is up-right, and unpressed is 1.28571
@@ -89,8 +97,8 @@ export function normalizeGamepad(pad) {
       // shoulder buttons
       origButtons[4],
       origButtons[5],
-      { pressed: l2 > 0.1, touched: l2 > 0.1, value: l2 },
-      { pressed: r2 > 0.1, touched: r2 > 0.1, value: r2 },
+      valueToButton(l2),
+      valueToButton(r2),
 
       // start, select
       origButtons[8],
@@ -114,53 +122,126 @@ export function normalizeGamepad(pad) {
       origButtons[14],
     ];
 
-    return {
+    return ({
       axes,
       buttons,
       index: pad.index,
       id: pad.id,
       mapping: pad.mapping,
-    };
+    });
   }
-  return pad;
+
+  // The standard mapping only has 4 axes, but some browser/gamepad combinations
+  // (e.g. DS4 on Firefox) present additional axes containing analog values for
+  // the triggers
+  if (pad.mapping === 'standard' && pad.axes.length === 6) {
+    const buttons = pad.buttons.slice();
+    const l2 = axisToButtonValue(pad.axes[4]);
+    const r2 = axisToButtonValue(pad.axes[5]);
+    buttons[6] = valueToButton(l2);
+    buttons[7] = valueToButton(r2);
+    return ({
+      axes: pad.axes.slice(0, 4),
+      buttons: buttons,
+      index: pad.index,
+      id: pad.id,
+      mapping: pad.mapping,
+    });
+  }
+
+  return ({
+    axes: pad.axes,
+    buttons: pad.buttons,
+    index: pad.index,
+    id: pad.id,
+    mapping: pad.mapping,
+  });
 }
 
 /**
- * Returns the first pressed input
- * @param {(GamepadData|null)[]} pads
- * @param {(readonly PadInput[])|undefined} inputs
+ * @param {number} axis 
  * @returns {number}
  */
-export function readInputs(pads, inputs) {
-  if (inputs == null) {
-    return 0;
-  }
-  for (const input of inputs) {
-    const val = readInput(pads, input);
-    if (val !== 0) {
-      return val;
-    }
-  }
-  return 0;
+function axisToButtonValue(axis) {
+  // Trigger values on DS4/Dualsense are rather annoying; they have a value of
+  // 0.0 until you first press them. Relying on the assumption that 0.0 is
+  // basically impossible to get otherwise.
+  return ((axis || -1) + 1) / 2;
+}
+
+/**
+ * @param {number} l2 
+ * @returns {GamepadButton}
+ */
+function valueToButton(l2) {
+  return { pressed: l2 > 0.1, touched: l2 > 0.1, value: l2 };
+}
+
+/**
+ * @param {PadInput} a 
+ * @param {PadInput} b 
+ * @returns {number}
+ */
+function byModifiersDecreasing(a, b) {
+  return (b.modifiers?.length || 0) - (a.modifiers?.length || 0);
 }
 
 /**
  * @param {(GamepadData|null)[]} pads
  * @param {PadInput} input
- * @returns {number}
+ * @returns {{
+ *   value: number,
+ *   pressed: boolean,
+ * }}
  */
 export function readInput(pads, input) {
+  const { value, pressed } = readUnmodifiedInput(pads, input);
+  if (pressed  && input.modifiers?.length) {
+    for (const m of input.modifiers) {
+      if (!readUnmodifiedInput(pads, m).pressed) {
+        return ({
+          value: 0,
+          pressed: false,
+        });
+      }
+    }
+  }
+  return ({ value, pressed });
+}
+
+/**
+ * @param {(GamepadData|null)[]} pads
+ * @param {UnmodifiedInput} input
+ * @returns {{
+ *   value: number,
+ *   pressed: boolean,
+ * }}
+ */
+export function readUnmodifiedInput(pads, input) {
   const pad = pads[input.padIndex];
   if (pad == null) {
-    return 0;
+    return ({
+      value: 0,
+      pressed: false,
+    });
   }
+
   const button = /** @type {GamepadButton|undefined} */(pad.buttons[input.inputIndex]);
   const axis = /** @type {number|undefined} */(pad.axes[input.inputIndex]);
+  let rawValue = 0;
   switch (input.type) {
     case 'button':
-      return Math.max(0, ignoreDeadzone(button?.value ?? 0) * input.multiplier);
+      rawValue = ignoreDeadzone(button?.value ?? 0);
+      return ({
+        value: Math.max(0, rawValue * input.multiplier),
+        pressed: rawValue !== 0,
+      });
     case 'axis':
-      return Math.max(0, ignoreDeadzone(axis ?? 0) * input.multiplier);
+      rawValue = ignoreDeadzone(axis ?? 0);
+      return ({
+        value: Math.max(0, rawValue * input.multiplier),
+        pressed: rawValue !== 0,
+      });
   }
 }
 
@@ -180,34 +261,31 @@ function ignoreDeadzone(val) {
  * @returns {function(): void} a cancel/cleanup function
  */
 export function waitForGamepadInput(callback) {
+  /** @type {Record<string, GamepadData>} */
+  const previousPads = {};
   function findPressedInput() {
     for (const gamepad of navigator.getGamepads()) {
       const pad = normalizeGamepad(gamepad);
       if (pad == null) {
         continue;
       }
-      for (let i = 0; i < pad.buttons.length; i++) {
-        if (pad.buttons[i].pressed && pad.buttons[i].value > 0.75) {
-          callback({
-            padIndex: pad.index,
-            type: 'button',
-            inputIndex: i,
-            multiplier: 1.0,
-          });
-          return;
-        }
+
+      const previousPad = previousPads[pad.id];
+      previousPads[pad.id] = clonePad(pad);
+      if (previousPad == null) {
+        continue;
       }
-      for (let i = 0; i < pad.axes.length; i++) {
-        if (Math.abs(pad.axes[i]) > 0.75) {
-          callback({
-            padIndex: pad.index,
-            type: 'axis',
-            inputIndex: i,
-            multiplier: pad.axes[i] > 0 ? 1.0 : -1.0,
-          });
-          return;
-        }
+
+      const releasedInput = findReleasedInput(previousPad, pad);
+      if (!releasedInput) {
+        continue;
       }
+
+      const heldInputs = findHeldInputs(pad);
+      callback({
+        ...releasedInput,
+        modifiers: heldInputs.length ? heldInputs : undefined,
+      });
     }
   }
   const interval = setInterval(findPressedInput, 100);
@@ -217,12 +295,76 @@ export function waitForGamepadInput(callback) {
   };
 }
 
+/**
+ * @param {GamepadData} oldPad 
+ * @param {GamepadData} newPad 
+ * @returns {UnmodifiedInput | null}
+ */
+function findReleasedInput(oldPad, newPad) {
+  for (let i = 0; i < newPad.buttons.length; i++) {
+    const wasPressed = oldPad.buttons[i].pressed && oldPad.buttons[i].value > PRESSED_THRESHOLD;
+    const nowReleased = !newPad.buttons[i].pressed;
+    if (wasPressed && nowReleased) {
+      return ({
+        padIndex: newPad.index,
+        type: 'button',
+        inputIndex: i,
+        multiplier: 1.0,
+      });
+    }
+  }
+  for (let i = 0; i < newPad.axes.length; i++) {
+    const wasPressed = Math.abs(oldPad.axes[i]) > PRESSED_THRESHOLD;
+    const nowReleased = Math.abs(newPad.axes[i]) <= PRESSED_THRESHOLD;
+    if (wasPressed && nowReleased) {
+      return ({
+        padIndex: newPad.index,
+        type: 'axis',
+        inputIndex: i,
+        multiplier: newPad.axes[i] > 0 ? 1.0 : -1.0,
+      });
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {GamepadData} pad 
+ * @returns {UnmodifiedInput[]}
+ */
+function findHeldInputs(pad) {
+  /** @type {UnmodifiedInput[]} */
+  const inputs = [];
+  for (let i = 0; i < pad.buttons.length; i++) {
+    if (pad.buttons[i].pressed && pad.buttons[i].value > 0.75) {
+      inputs.push({
+        padIndex: pad.index,
+        type: 'button',
+        inputIndex: i,
+        multiplier: 1.0,
+      });
+    }
+  }
+  for (let i = 0; i < pad.axes.length; i++) {
+    if (Math.abs(pad.axes[i]) > 0.75) {
+      inputs.push({
+        padIndex: pad.index,
+        type: 'axis',
+        inputIndex: i,
+        multiplier: pad.axes[i] > 0 ? 1.0 : -1.0,
+      });
+    }
+  }
+  return inputs;
+}
+
 /** @type {PadInput} */
 const EXAMPLE_PADINPUT = Object.freeze({
   padIndex: 0,
   type: 'axis',
   inputIndex: 0,
   multiplier: 1.0,
+  modifiers: [],
 });
 const SORTED_MAPPINGS_KEYS = [
   ...Object.keys(EMPTY_MAPPING),
@@ -251,3 +393,22 @@ export function areMappingsEqual(a, b) {
 export function arePadInputsEqual(a, b) {
   return JSON.stringify(a, SORTED_MAPPINGS_KEYS) === JSON.stringify(b, SORTED_MAPPINGS_KEYS);
 }
+
+/**
+ * @param {GamepadData} pad 
+ * @returns {GamepadData}
+ */
+function clonePad(pad) {
+  return ({
+    id: pad.id,
+    index: pad.index,
+    mapping: pad.mapping,
+    axes: pad.axes.slice(),
+    buttons: pad.buttons.map(b => ({
+      pressed: b.pressed,
+      value: b.value,
+      touched: b.touched,
+    })),
+  });
+}
+

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'htm/preact';
 
-/** @import { GamepadData, Mapping, Mappings } from './mapping.js'; */
-import { normalizeGamepad, readInputs } from './mapping.js';
+/** @import { GamepadData, Mapping, Mappings, PadInput } from './mapping.js'; */
+import { normalizeGamepad, readInput } from './mapping.js';
 import { useMouseControl, mouseControlsToControlStates } from './mouse.js';
 /** @import { CommandMessage, Group } from './server.js'; */
 /** @import { ControlState, ControlStates } from './state.js'; */
@@ -16,6 +16,16 @@ import { allStatesEqual, isZero, mergeStates, ZERO_STATE } from './state.js';
 
 /**
  * @typedef {Record<string, SendState>} SendStates
+ */
+
+/**
+ * @typedef {{
+ *   controlName: keyof Mapping,
+ *   input: PadInput,
+ *   baseInput: string,
+ *   numModifiers: number,
+ *   skip: boolean,
+ * }} AnnotatedInput
  */
 
 const EPSILON = 0.5 * 1 / 240; // Ideally this would be based on the display refresh rate
@@ -125,13 +135,69 @@ export function readGamepads(mappings, prevStates) {
  * @returns {ControlState}
  */
 function readMapping(pads, mapping, prevState) {
-  const pan = -1 * readInputs(pads, mapping.panL) + readInputs(pads, mapping.panR);
-  const tilt = -1 * readInputs(pads, mapping.tiltD) + readInputs(pads, mapping.tiltU);
-  const roll = -1 * readInputs(pads, mapping.rollL) + readInputs(pads, mapping.rollR);
-  const zoom = -1 * readInputs(pads, mapping.zoomO) + readInputs(pads, mapping.zoomI);
-  const focus = -1 * readInputs(pads, mapping.focusN) + readInputs(pads, mapping.focusF);
-  const autofocusPressed = readInputs(pads, mapping.focusA) > 0;
-  const autofocus = {
+  const mappedInputs = /** @type {(keyof Mapping)[]} */(Object.keys(mapping))
+    .flatMap(name => annotateInputs(name, mapping[name] || []))
+    .sort(byNumModifiersDecreasing);
+
+  let pan = 0;
+  let tilt = 0;
+  let roll = 0;
+  let zoom = 0;
+  let focus = 0;
+  let autofocus = 0;
+  for (const i of mappedInputs) {
+    if (i.skip) {
+      continue;
+    }
+    const { value, pressed } = readInput(pads, i.input);
+    switch(i.controlName) {
+      case 'panL':
+        pan += -1 * value;
+        break;
+      case 'panR':
+        pan += value;
+        break;
+      case 'tiltD':
+        tilt += -1 * value;
+        break;
+      case 'tiltU':
+        tilt += value;
+        break;
+      case 'rollL':
+        roll += -1 * value;
+        break;
+      case 'rollR':
+        roll += value;
+        break;
+      case 'zoomO':
+        zoom += -1 * value;
+        break;
+      case 'zoomI':
+        zoom += value;
+        break;
+      case 'focusN':
+        focus += -1 * value;
+        break;
+      case 'focusF':
+        focus += value;
+        break;
+      case 'focusA':
+        autofocus += value;
+        break;
+    }
+    if (pressed) {
+      for (const ii of mappedInputs) {
+        if (ii.baseInput === i.baseInput &&
+          ii.numModifiers < i.numModifiers)
+        {
+          ii.skip = true;
+        }
+      }
+    }
+  }
+
+  const autofocusPressed = autofocus > 0;
+  const autofocusState = {
     pressed: autofocusPressed,
     active: prevState?.autofocus.active || (autofocusPressed && !prevState?.autofocus.pressed),
   };
@@ -142,6 +208,39 @@ function readMapping(pads, mapping, prevState) {
     roll,
     zoom,
     focus,
-    autofocus,
+    autofocus: autofocusState,
   };
 }
+
+/**
+ * @param {keyof Mapping} controlName 
+ * @param {readonly PadInput[]} inputs 
+ * @returns {AnnotatedInput[]}
+ */
+function annotateInputs(controlName, inputs) {
+  return inputs.map(i => ({
+    input: i,
+    controlName,
+    baseInput: inputIdentifier(i),
+    numModifiers: i.modifiers?.length || 0,
+    skip: false,
+  }));
+}
+
+/**
+ * @param {PadInput} i 
+ * @returns {string}
+ */
+function inputIdentifier(i) {
+  return `${i.padIndex}_${i.type}${i.inputIndex}`;
+}
+
+/**
+ * @param {AnnotatedInput} a 
+ * @param {AnnotatedInput} b 
+ * @returns {number}
+ */
+function byNumModifiersDecreasing(a, b) {
+  return b.numModifiers - a.numModifiers;
+}
+
