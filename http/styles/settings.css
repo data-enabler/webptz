@@ -4,7 +4,10 @@
   right: 0;
   margin: 0.5rem;
 
+  padding-bottom: 0.2em;
+
   font-size: 1.25rem;
+  text-shadow: 1px 1px 0 black;
 }
 
 .settings__container {
