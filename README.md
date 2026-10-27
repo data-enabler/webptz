@@ -43,7 +43,7 @@ Device compatibility is mainly limited by what gear I have access to (and time).
 
 ## UI Demo
 
-Try out [this UI demo page](https://rawcdn.githack.com/data-enabler/webptz/master/http/index.html?mock) to get a sense for how the UI and gamepad support works.
+Try out [this UI demo page](https://data-enabler.github.io/webptz/http/index.html?mock) to get a sense for how the UI and gamepad support works.
 Note that this is only a demo of the UI, and won't control any devices.
 
 ## Usage
